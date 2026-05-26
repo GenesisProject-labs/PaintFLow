@@ -1104,6 +1104,13 @@
                 <button class="btn-cancel" onclick="cerrarDashboardAnalista()">Cerrar</button>
             </div>
 
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap: wrap;">
+                <label for="analystZonaSelector" style="font-weight:600; color:#26496b;">Filtrar por zona:</label>
+                <select id="analystZonaSelector" class="search-input" style="width: 280px;" onchange="updateAnalystZoneView()">
+                    <option value="ALL">Todas las Zonas</option>
+                </select>
+            </div>
+
             <div class="dashboard-grid-4">
                 <div class="dashboard-card">
                     <div class="dashboard-card-label">Sucursales Activas</div>
@@ -1184,6 +1191,7 @@
         let analystMetricsCache = null;
         let analystZoneUsageChart = null;
         let analystCompletionChart = null;
+        let analystCurrentZona = 'ALL';
         
         function fmt(posicion) {
             const map = {
@@ -1348,64 +1356,153 @@
             });
         }
 
-        function renderAnalystDashboard(data) {
-            const totalSuc = document.getElementById('analystTotalSucursales');
-            const totalEmpA = document.getElementById('analystTotalEmpleadosActivos');
-            const avgComp = document.getElementById('analystAvgCompletion');
-            const totalComp = document.getElementById('analystCompletedOrders');
-            const status = document.getElementById('analystDashboardStatus');
+        function zoneKeyToLabel(zoneKey) {
+            return (zoneKey || 'SIN_ZONA').replace(/_/g, ' ');
+        }
 
-            if (totalSuc) totalSuc.textContent = String((allSucursales || []).filter(s => s.activo !== false).length);
-            if (totalEmpA) totalEmpA.textContent = String((allEmpleados || []).filter(e => e.activo === true || e.activo === 1).length);
-            if (avgComp) avgComp.textContent = `${Number(data.avg_completion_minutes_overall || 0).toFixed(2)} min`;
-            if (totalComp) totalComp.textContent = String(Number(data.total_completed_orders || 0));
+        function getZoneFromSucursalName(sucursalName) {
+            const target = normalizeTextBasic(sucursalName);
+            if (!target) return 'SIN_ZONA';
+            const match = (allSucursales || []).find(s => normalizeTextBasic(s.nombre || s.sucursal_nombre || s.name) === target);
+            return normalizeZonaKey(match && (match.zona || match.zona_nombre || match.region || 'SIN_ZONA'));
+        }
 
+        function getAnalystZonaUsageRows(data) {
+            if (Array.isArray(data.zona_usage) && data.zona_usage.length) {
+                return data.zona_usage
+                    .map(z => ({
+                        zona: normalizeZonaKey(z.zona),
+                        facturas: Number(z.facturas || 0),
+                        items: Number(z.items || 0),
+                        sucursales: Number(z.sucursales || 0),
+                        avg_completion_minutes: Number(z.avg_completion_minutes || 0),
+                        ordenes_finalizadas: Number(z.ordenes_finalizadas || 0)
+                    }))
+                    .sort((a, b) => (b.facturas - a.facturas) || (b.items - a.items));
+            }
+
+            const byZona = {};
+            (data.sucursal_usage || []).forEach(row => {
+                const zona = normalizeZonaKey(row.zona || getZoneFromSucursalName(row.sucursal));
+                if (!byZona[zona]) {
+                    byZona[zona] = { zona, facturas: 0, items: 0, sucursales: 0, avg_completion_minutes: 0, ordenes_finalizadas: 0 };
+                }
+                byZona[zona].facturas += Number(row.facturas || 0);
+                byZona[zona].items += Number(row.items || 0);
+                byZona[zona].sucursales += 1;
+            });
+
+            return Object.values(byZona).sort((a, b) => (b.facturas - a.facturas) || (b.items - a.items));
+        }
+
+        function updateAnalystZoneSelector(data) {
+            const selector = document.getElementById('analystZonaSelector');
+            if (!selector) return;
+
+            const rows = getAnalystZonaUsageRows(data);
+            const selected = selector.value || analystCurrentZona || 'ALL';
+            const opts = ['<option value="ALL">Todas las Zonas</option>'];
+
+            rows.forEach(r => {
+                opts.push(`<option value="${r.zona}">${zoneKeyToLabel(r.zona)}</option>`);
+            });
+
+            selector.innerHTML = opts.join('');
+            const exists = rows.some(r => r.zona === selected);
+            selector.value = exists || selected === 'ALL' ? selected : 'ALL';
+            analystCurrentZona = selector.value;
+        }
+
+        function getFilteredSucursalUsage(data, selectedZona) {
+            const rows = (data.sucursal_usage || []).map(row => ({
+                ...row,
+                zona: normalizeZonaKey(row.zona || getZoneFromSucursalName(row.sucursal))
+            }));
+
+            if (!selectedZona || selectedZona === 'ALL') return rows;
+            return rows.filter(r => r.zona === selectedZona);
+        }
+
+        function renderAnalystZoneTopProductsTable(data, selectedZona) {
             const topBody = document.getElementById('analystZoneTopProductsBody');
-            if (topBody) {
-                const rows = [];
-                (data.zone_top_products || []).forEach(zone => {
-                    (zone.top_products || []).slice(0, 3).forEach(p => {
-                        rows.push({ zona: zone.zona, producto: p.producto, cantidad: Number(p.cantidad || 0) });
-                    });
-                });
-                topBody.innerHTML = rows.length
-                    ? rows.map(r => `<tr><td style="padding:8px;border:1px solid #ddd;">${(r.zona || '').replace(/_/g, ' ')}</td><td style="padding:8px;border:1px solid #ddd;">${r.producto || 'N/A'}</td><td style="padding:8px;border:1px solid #ddd;text-align:right;">${r.cantidad}</td></tr>`).join('')
-                    : '<tr><td colspan="3" style="text-align:center; padding:10px; border:1px solid #ddd;">Sin datos</td></tr>';
+            if (!topBody) return;
+
+            let rows = (data.zone_top_products || []).map(z => ({
+                zona: normalizeZonaKey(z.zona),
+                top_products: z.top_products || []
+            }));
+
+            if (selectedZona && selectedZona !== 'ALL') {
+                rows = rows.filter(r => r.zona === selectedZona);
             }
 
+            const flat = [];
+            rows.forEach(zone => {
+                (zone.top_products || []).slice(0, 3).forEach(p => {
+                    flat.push({ zona: zone.zona, producto: p.producto || 'N/A', cantidad: Number(p.cantidad || 0) });
+                });
+            });
+
+            topBody.innerHTML = flat.length
+                ? flat.map(r => `<tr><td style="padding:8px;border:1px solid #ddd;">${zoneKeyToLabel(r.zona)}</td><td style="padding:8px;border:1px solid #ddd;">${r.producto}</td><td style="padding:8px;border:1px solid #ddd;text-align:right;">${r.cantidad}</td></tr>`).join('')
+                : '<tr><td colspan="3" style="text-align:center; padding:10px; border:1px solid #ddd;">Sin datos</td></tr>';
+        }
+
+        function formatDateTimeSafe(isoText) {
+            if (!isoText) return 'Sin registro';
+            const dt = new Date(isoText);
+            if (Number.isNaN(dt.getTime())) return 'Sin registro';
+            return `${dt.toLocaleDateString('es-DO')} ${dt.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })}`;
+        }
+
+        function renderAnalystSucursalLoginByZoneTable(data, selectedZona) {
             const loginBody = document.getElementById('analystSucursalLoginBody');
-            if (loginBody) {
-                const rows = [];
-                (data.sucursal_login_by_zone || []).forEach(group => {
-                    (group.sucursales || []).forEach(s => {
-                        const dt = s.ultimo_login ? new Date(s.ultimo_login) : null;
-                        const dtTxt = dt && !Number.isNaN(dt.getTime())
-                            ? `${dt.toLocaleDateString('es-DO')} ${dt.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })}`
-                            : 'Sin registro';
-                        rows.push({
-                            zona: group.zona,
-                            sucursal: s.sucursal,
-                            login: dtTxt,
-                            user: s.ultimo_login_username || '-'
-                        });
-                    });
-                });
-                loginBody.innerHTML = rows.length
-                    ? rows.map(r => `<tr><td style="padding:8px;border:1px solid #ddd;">${(r.zona || '').replace(/_/g, ' ')}</td><td style="padding:8px;border:1px solid #ddd;">${r.sucursal || 'N/A'}</td><td style="padding:8px;border:1px solid #ddd;">${r.login}</td><td style="padding:8px;border:1px solid #ddd;">${r.user}</td></tr>`).join('')
-                    : '<tr><td colspan="4" style="text-align:center; padding:10px; border:1px solid #ddd;">Sin datos</td></tr>';
+            if (!loginBody) return;
+
+            let groups = (data.sucursal_login_by_zone || []).map(g => ({
+                zona: normalizeZonaKey(g.zona),
+                sucursales: g.sucursales || []
+            }));
+
+            if (selectedZona && selectedZona !== 'ALL') {
+                groups = groups.filter(g => g.zona === selectedZona);
             }
 
-            const zones = data.zona_usage || [];
+            const flat = [];
+            groups.forEach(group => {
+                (group.sucursales || []).forEach(s => {
+                    flat.push({
+                        zona: group.zona,
+                        sucursal: s.sucursal || 'N/A',
+                        login: formatDateTimeSafe(s.ultimo_login),
+                        user: s.ultimo_login_username || '-'
+                    });
+                });
+            });
+
+            loginBody.innerHTML = flat.length
+                ? flat.map(r => `<tr><td style="padding:8px;border:1px solid #ddd;">${zoneKeyToLabel(r.zona)}</td><td style="padding:8px;border:1px solid #ddd;">${r.sucursal}</td><td style="padding:8px;border:1px solid #ddd;">${r.login}</td><td style="padding:8px;border:1px solid #ddd;">${r.user}</td></tr>`).join('')
+                : '<tr><td colspan="4" style="text-align:center; padding:10px; border:1px solid #ddd;">Sin datos</td></tr>';
+        }
+
+        function renderAnalystCharts(data, selectedZona) {
+            if (typeof Chart === 'undefined') return;
+
+            const allZoneRows = getAnalystZonaUsageRows(data);
+            const zoneRows = selectedZona === 'ALL'
+                ? allZoneRows
+                : allZoneRows.filter(z => z.zona === selectedZona);
+
             const usageCanvas = document.getElementById('analystZoneUsageChart');
-            if (usageCanvas && typeof Chart !== 'undefined') {
+            if (usageCanvas) {
                 if (analystZoneUsageChart) analystZoneUsageChart.destroy();
                 analystZoneUsageChart = new Chart(usageCanvas, {
                     type: 'bar',
                     data: {
-                        labels: zones.map(z => (z.zona || '').replace(/_/g, ' ')),
+                        labels: zoneRows.map(z => zoneKeyToLabel(z.zona)),
                         datasets: [
-                            { label: 'Facturas', data: zones.map(z => Number(z.facturas || 0)), backgroundColor: '#1a73e8' },
-                            { label: 'Items', data: zones.map(z => Number(z.items || 0)), backgroundColor: '#17a398' }
+                            { label: 'Facturas', data: zoneRows.map(z => Number(z.facturas || 0)), backgroundColor: '#1a73e8' },
+                            { label: 'Items', data: zoneRows.map(z => Number(z.items || 0)), backgroundColor: '#17a398' }
                         ]
                     },
                     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Carga por Zona' } } }
@@ -1413,15 +1510,15 @@
             }
 
             const completionCanvas = document.getElementById('analystCompletionChart');
-            if (completionCanvas && typeof Chart !== 'undefined') {
+            if (completionCanvas) {
                 if (analystCompletionChart) analystCompletionChart.destroy();
                 analystCompletionChart = new Chart(completionCanvas, {
                     type: 'bar',
                     data: {
-                        labels: zones.map(z => (z.zona || '').replace(/_/g, ' ')),
+                        labels: zoneRows.map(z => zoneKeyToLabel(z.zona)),
                         datasets: [
-                            { label: 'Promedio finalización (min)', data: zones.map(z => Number(z.avg_completion_minutes || 0)), backgroundColor: '#f59e0b' },
-                            { label: 'Órdenes finalizadas', type: 'line', data: zones.map(z => Number(z.ordenes_finalizadas || 0)), borderColor: '#0f766e', backgroundColor: 'rgba(15,118,110,0.2)', yAxisID: 'y1' }
+                            { label: 'Promedio finalización (min)', data: zoneRows.map(z => Number(z.avg_completion_minutes || 0)), backgroundColor: '#f59e0b' },
+                            { label: 'Órdenes finalizadas', type: 'line', data: zoneRows.map(z => Number(z.ordenes_finalizadas || 0)), borderColor: '#0f766e', backgroundColor: 'rgba(15,118,110,0.2)', yAxisID: 'y1' }
                         ]
                     },
                     options: {
@@ -1435,6 +1532,75 @@
                     }
                 });
             }
+        }
+
+        function updateAnalystZoneView() {
+            if (!analystMetricsCache) return;
+
+            const selector = document.getElementById('analystZonaSelector');
+            const selectedZona = selector ? selector.value : 'ALL';
+            analystCurrentZona = selectedZona;
+
+            const totalSuc = document.getElementById('analystTotalSucursales');
+            const totalEmpA = document.getElementById('analystTotalEmpleadosActivos');
+            const avgComp = document.getElementById('analystAvgCompletion');
+            const totalComp = document.getElementById('analystCompletedOrders');
+            const status = document.getElementById('analystDashboardStatus');
+
+            const filteredRows = getFilteredSucursalUsage(analystMetricsCache, selectedZona);
+            const zonasRows = getAnalystZonaUsageRows(analystMetricsCache);
+            const selectedZoneRows = selectedZona === 'ALL'
+                ? zonasRows
+                : zonasRows.filter(z => z.zona === selectedZona);
+
+            const sucCount = selectedZona === 'ALL'
+                ? (allSucursales || []).filter(s => s.activo !== false).length
+                : filteredRows.length;
+
+            const activeEmpCount = (allEmpleados || []).filter(e => {
+                const isActive = e.activo === true || e.activo === 1;
+                if (!isActive) return false;
+                if (selectedZona === 'ALL') return true;
+                return normalizeZonaKey(getZoneFromSucursalName(e.sucursal_nombre || e.sucursal || '')) === selectedZona;
+            }).length;
+
+            const totalCompleted = selectedZoneRows.reduce((acc, z) => acc + Number(z.ordenes_finalizadas || 0), 0);
+            const weightedAvgComp = totalCompleted
+                ? selectedZoneRows.reduce((acc, z) => acc + (Number(z.avg_completion_minutes || 0) * Number(z.ordenes_finalizadas || 0)), 0) / totalCompleted
+                : Number(analystMetricsCache.avg_completion_minutes_overall || 0);
+
+            if (totalSuc) totalSuc.textContent = String(Number(sucCount || 0));
+            if (totalEmpA) totalEmpA.textContent = String(Number(activeEmpCount || 0));
+            if (avgComp) avgComp.textContent = `${Number(weightedAvgComp || 0).toFixed(2)} min`;
+            if (totalComp) totalComp.textContent = String(Number(totalCompleted || 0));
+
+            renderAnalystZoneTopProductsTable(analystMetricsCache, selectedZona);
+            renderAnalystSucursalLoginByZoneTable(analystMetricsCache, selectedZona);
+            renderAnalystCharts(analystMetricsCache, selectedZona);
+
+            if (status && String(status.textContent || '').startsWith('Actualizado')) {
+                status.textContent = `Actualizado (${selectedZona === 'ALL' ? 'Todas las Zonas' : zoneKeyToLabel(selectedZona)}): ${new Date().toLocaleTimeString('es-DO')}`;
+            }
+        }
+
+        function renderAnalystDashboard(data) {
+            const totalSuc = document.getElementById('analystTotalSucursales');
+            const totalEmpA = document.getElementById('analystTotalEmpleadosActivos');
+            const avgComp = document.getElementById('analystAvgCompletion');
+            const totalComp = document.getElementById('analystCompletedOrders');
+            const status = document.getElementById('analystDashboardStatus');
+
+            if (totalSuc) totalSuc.textContent = '0';
+            if (totalEmpA) totalEmpA.textContent = '0';
+            if (avgComp) avgComp.textContent = '0.00 min';
+            if (totalComp) totalComp.textContent = '0';
+
+            updateAnalystZoneSelector(data);
+            if (analystCurrentZona) {
+                const selector = document.getElementById('analystZonaSelector');
+                if (selector) selector.value = analystCurrentZona;
+            }
+            updateAnalystZoneView();
 
             if (status) status.textContent = `Actualizado: ${new Date().toLocaleTimeString('es-DO')}`;
         }
