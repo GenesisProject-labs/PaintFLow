@@ -1700,7 +1700,6 @@
             menu.querySelectorAll(".autocomplete-item").forEach((el, idx) => {
                 el.addEventListener("mouseenter", () => {
                     activeSuggestionIndex = idx;
-                    setCodeSuggestions(codeSuggestions);
                 });
                 const onPick = (ev) => {
                     ev.preventDefault();
@@ -1739,7 +1738,6 @@
             menu.querySelectorAll(".autocomplete-item").forEach((el, idx) => {
                 el.addEventListener("mouseenter", () => {
                     activeDescriptionSuggestionIndex = idx;
-                    setDescriptionSuggestions(descriptionSuggestions);
                 });
                 const onPick = (ev) => {
                     ev.preventDefault();
@@ -1793,7 +1791,6 @@
             menu.querySelectorAll(".autocomplete-item").forEach((el, idx) => {
                 el.addEventListener("mouseenter", () => {
                     activeProductSuggestionIndex = idx;
-                    setProductSuggestions(productSuggestions);
                 });
                 const onPick = (ev) => {
                     ev.preventDefault();

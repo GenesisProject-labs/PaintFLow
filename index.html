@@ -1434,6 +1434,28 @@ async function handleLogin(e) {
         console.log('OK Autenticacion exitosa para:', usuario);
         
         saveSession(usuarioData);
+
+        const userRole = normalizeRole(usuarioData.rol);
+
+        // Redirección por rol primero para evitar que cualquier lógica visual de admin se ejecute por error.
+        if (userRole === 'analista') {
+            console.log('Usuario analista detectado, redirigiendo a /employees');
+            window.location.replace('/employees');
+            return;
+        }
+
+        if (isStoreRole(userRole)) {
+            console.log('Usuario de tienda detectado, redirigiendo a /labelsapp-web');
+            window.location.replace('/labelsapp-web');
+            return;
+        }
+
+        if (userRole !== 'administrador') {
+            clearSession();
+            errorDiv.textContent = 'Acceso restringido para este rol';
+            errorDiv.classList.add('show');
+            return;
+        }
         
         // Actualizar nombre de usuario en el navbar
         const nombre = usuarioData.nombre_completo || usuarioData.username || 'Usuario';
@@ -1444,28 +1466,6 @@ async function handleLogin(e) {
         
         // Actualizar menú según el rol
         updateUserMenu(usuarioData.rol || '');
-        
-        // Si es ANALISTA, redirigir directo a empleados sin mostrar dashboard
-        const userRole = normalizeRole(usuarioData.rol);
-        if (userRole === 'analista') {
-            console.log('Usuario analista detectado, redirigiendo a /employees');
-            window.location.href = '/employees';
-            return;
-        }
-
-        // Si es FACTURADOR/CAJERO, redirigir directo a LabelsApp Web
-        if (isStoreRole(userRole)) {
-            console.log('Usuario de tienda detectado, redirigiendo a /labelsapp-web');
-            window.location.href = '/labelsapp-web';
-            return;
-        }
-
-        if (userRole !== 'administrador') {
-            clearSession();
-            errorDiv.textContent = 'Acceso restringido para este rol';
-            errorDiv.classList.add('show');
-            return;
-        }
         
         // Si es ADMIN, mostrar dashboard
         const loginContainer = document.getElementById("loginContainer");
@@ -2962,7 +2962,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         function goToFormulas() {
             // Verificar rol antes de navegar
             const userData = JSON.parse(localStorage.getItem('currentUser') || '{}');
-            const userRole = userData.rol;
+            const userRole = normalizeRole(userData.rol);
             
             if (userRole !== 'analista') {
                 alert('Acceso restringido: Solo los analistas pueden acceder a fórmulas');
@@ -2979,7 +2979,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         function updateUserMenu(userRole) {
             const dropdown = document.getElementById('userDropdown');
             const navbarTabs = document.getElementById('navbarTabs');
-            userRole = (userRole || '').toLowerCase();
+            userRole = normalizeRole(userRole);
             
             if (!dropdown) return;
             
