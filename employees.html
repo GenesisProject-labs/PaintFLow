@@ -1443,18 +1443,28 @@
             const status = document.getElementById('analystDashboardStatus');
             if (status) status.textContent = 'Cargando métricas...';
             try {
-                const res = await fetch(API + '/api/v1/labelsapp/usage-metrics?product_limit=5');
+                const cached = getCachedAnalystMetrics();
+                if (cached) {
+                    analystMetricsCache = cached;
+                    renderAnalystDashboard(cached);
+                    if (status) status.textContent = 'Mostrando cache, actualizando datos...';
+                }
+
+                const res = await fetchWithTimeout(API + '/api/v1/labelsapp/usage-metrics?product_limit=5', 5000);
                 if (!res.ok) throw new Error('No se pudo cargar dashboard de analista');
                 const data = await res.json();
                 analystMetricsCache = data;
+                setCachedAnalystMetrics(data);
                 renderAnalystDashboard(data);
+                if (status) status.textContent = `Actualizado: ${new Date().toLocaleTimeString('es-DO')}`;
             } catch (err) {
                 try {
                     const fallback = await buildAnalystFallbackMetrics();
                     analystMetricsCache = fallback;
+                    setCachedAnalystMetrics(fallback);
                     renderAnalystDashboard(fallback);
                     if (status) {
-                        status.textContent = 'Mostrando datos base por contingencia (usage-metrics no disponible).';
+                        status.textContent = `Modo fallback activo: métricas live por zonas (${new Date().toLocaleTimeString('es-DO')})`;
                     }
                 } catch (fallbackErr) {
                     if (status) {
@@ -1464,133 +1474,141 @@
             }
         }
 
-        function normalizeZonaKey(value) {
-            if (!value) return 'SIN_ZONA';
-            return String(value)
-                .trim()
-                .toUpperCase()
+        function normalizeTextBasic(text) {
+            return (text || '')
+                .toString()
                 .normalize('NFD')
                 .replace(/[\u0300-\u036f]/g, '')
-                .replace(/\s+/g, '_');
+                .toLowerCase()
+                .trim();
         }
 
-        function createEmptyZoneMetrics(zonaSet) {
-            return Array.from(zonaSet).map(z => ({
-                zona: z,
-                facturas: 0,
-                items: 0,
-                avg_completion_minutes: 0,
-                ordenes_finalizadas: 0
-            }));
+        function normalizeSucursalSlug(text) {
+            return normalizeTextBasic(text)
+                .replace(/[^a-z0-9]+/g, '_')
+                .replace(/^_+|_+$/g, '') || 'principal';
+        }
+
+        function normalizeZonaKey(value) {
+            const key = normalizeTextBasic(value)
+                .replace(/[^a-z0-9]+/g, '_')
+                .replace(/^_+|_+$/g, '');
+            return key ? key.toUpperCase() : 'SIN_ZONA';
+        }
+
+        function getCachedAnalystMetrics() {
+            try {
+                const raw = localStorage.getItem('analyst_metrics_cache_v1');
+                if (!raw) return null;
+                const parsed = JSON.parse(raw);
+                if (!parsed || !parsed.data || !parsed.ts) return null;
+                const ageMs = Date.now() - Number(parsed.ts || 0);
+                if (ageMs > 120000) return null;
+                return parsed.data;
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function setCachedAnalystMetrics(data) {
+            try {
+                localStorage.setItem('analyst_metrics_cache_v1', JSON.stringify({ ts: Date.now(), data }));
+            } catch (_) {}
+        }
+
+        async function fetchWithTimeout(url, timeoutMs = 6000) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                return await fetch(url, { signal: controller.signal });
+            } finally {
+                clearTimeout(timer);
+            }
+        }
+
+        async function mapWithConcurrency(items, limit, mapper) {
+            const results = new Array(items.length);
+            let current = 0;
+            const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+                while (true) {
+                    const idx = current;
+                    current += 1;
+                    if (idx >= items.length) break;
+                    results[idx] = await mapper(items[idx], idx);
+                }
+            });
+            await Promise.all(workers);
+            return results;
         }
 
         async function buildAnalystFallbackMetrics() {
-            const sucursales = Array.isArray(allSucursales) ? allSucursales : [];
-            const empleados = Array.isArray(allEmpleados) ? allEmpleados : [];
+            const sucRes = await fetchWithTimeout(API + '/api/v1/sucursales', 5000);
+            if (!sucRes.ok) throw new Error('No se pudo consultar sucursales para fallback');
+            const sucData = await sucRes.json();
+            const sucursales = Array.isArray(sucData.sucursales) ? sucData.sucursales : [];
 
-            const sucursalToZona = new Map();
-            const zonaToSucursales = new Map();
-            const zonas = new Set();
+            const filteredSucursales = sucursales.filter(s => (s && (s.nombre || '').trim()));
 
-            sucursales.forEach(s => {
-                const sucNombre = s.nombre || s.sucursal_nombre || s.name || '';
-                const zona = normalizeZonaKey(s.zona || s.zona_nombre || s.region || 'SIN_ZONA');
-                if (sucNombre) sucursalToZona.set(String(sucNombre).trim().toLowerCase(), zona);
-                zonas.add(zona);
-                if (!zonaToSucursales.has(zona)) zonaToSucursales.set(zona, []);
-                zonaToSucursales.get(zona).push({
-                    sucursal: sucNombre || 'N/A',
+            const requests = await mapWithConcurrency(filteredSucursales, 4, async suc => {
+                const sucursalNombre = suc.nombre || 'N/A';
+                const zona = normalizeZonaKey(suc.zona || suc.zona_nombre || suc.region || 'Sin Zona');
+                const slug = normalizeSucursalSlug(sucursalNombre);
+                try {
+                    const qRes = await fetchWithTimeout(API + `/api/v1/labelsapp/live-queue?sucursal=${encodeURIComponent(slug)}&limit=250`, 4500);
+                    if (!qRes.ok) return { sucursal: sucursalNombre, zona, facturas: 0, items: 0 };
+                    const queue = await qRes.json();
+                    const items = Array.isArray(queue.items) ? queue.items : [];
+                    const facturas = Number(queue.total || items.length || 0);
+                    const totalItems = items.reduce((acc, row) => acc + Number(row.items || 0), 0);
+                    return { sucursal: sucursalNombre, zona, facturas, items: totalItems };
+                } catch (_) {
+                    return { sucursal: sucursalNombre, zona, facturas: 0, items: 0 };
+                }
+            });
+
+            const sucursal_usage = requests.filter(r => Number(r.facturas || 0) > 0 || Number(r.items || 0) > 0);
+            sucursal_usage.sort((a, b) => (Number(b.facturas || 0) - Number(a.facturas || 0)) || (Number(b.items || 0) - Number(a.items || 0)));
+
+            const zonaMap = {};
+            sucursal_usage.forEach(row => {
+                const zona = row.zona || 'SIN_ZONA';
+                if (!zonaMap[zona]) zonaMap[zona] = { zona, facturas: 0, items: 0, sucursales: 0, avg_completion_minutes: 0, ordenes_finalizadas: 0 };
+                zonaMap[zona].facturas += Number(row.facturas || 0);
+                zonaMap[zona].items += Number(row.items || 0);
+                zonaMap[zona].sucursales += 1;
+            });
+
+            const zona_usage = Object.values(zonaMap).sort((a, b) => (b.facturas - a.facturas) || (b.items - a.items));
+
+            const sucursal_login_by_zone_map = {};
+            filteredSucursales.forEach(s => {
+                const zona = normalizeZonaKey(s.zona || s.zona_nombre || s.region || 'Sin Zona');
+                if (!sucursal_login_by_zone_map[zona]) sucursal_login_by_zone_map[zona] = [];
+                sucursal_login_by_zone_map[zona].push({
+                    sucursal: s.nombre || 'N/A',
                     ultimo_login: s.ultimo_login || null,
-                    ultimo_login_username: s.ultimo_login_username || s.username_ultimo_login || '-'
+                    ultimo_login_username: s.ultimo_login_username || s.username_ultimo_login || '-',
+                    top_producto: null
                 });
             });
 
-            if (zonas.size === 0) {
-                zonas.add('SIN_ZONA');
-            }
-
-            const usageMap = new Map(createEmptyZoneMetrics(zonas).map(z => [z.zona, z]));
-            const productMap = new Map();
-            const facturaSetByZona = new Map();
-            let completedOrders = 0;
-
-            let liveQueue = [];
-            try {
-                const liveRes = await fetch(API + '/api/v1/labelsapp/live-queue');
-                if (liveRes.ok) {
-                    const liveData = await liveRes.json();
-                    liveQueue = liveData.items || liveData.queue || (Array.isArray(liveData) ? liveData : []);
-                }
-            } catch (_) {
-                liveQueue = [];
-            }
-
-            liveQueue.forEach(item => {
-                const suc = (item.sucursal_nombre || item.sucursal || item.tienda || '').toString().trim().toLowerCase();
-                const zona = sucursalToZona.get(suc) || normalizeZonaKey(item.zona || 'SIN_ZONA');
-                if (!usageMap.has(zona)) {
-                    usageMap.set(zona, {
-                        zona,
-                        facturas: 0,
-                        items: 0,
-                        avg_completion_minutes: 0,
-                        ordenes_finalizadas: 0
-                    });
-                }
-
-                const usage = usageMap.get(zona);
-                const qty = Number(item.cantidad || item.qty || 1);
-                usage.items += Number.isFinite(qty) ? qty : 1;
-
-                const factura = item.factura || item.id_factura || item.numero_factura || item.pedido || item.order_id;
-                if (factura) {
-                    if (!facturaSetByZona.has(zona)) facturaSetByZona.set(zona, new Set());
-                    facturaSetByZona.get(zona).add(String(factura));
-                }
-
-                const status = String(item.estado || item.status || '').toLowerCase();
-                if (status.includes('finaliz') || status.includes('complet')) {
-                    usage.ordenes_finalizadas += 1;
-                    completedOrders += 1;
-                }
-
-                const producto = item.producto || item.product_name || item.descripcion || 'N/A';
-                const productKey = `${zona}||${producto}`;
-                productMap.set(productKey, (productMap.get(productKey) || 0) + 1);
-            });
-
-            usageMap.forEach((usage, zona) => {
-                usage.facturas = (facturaSetByZona.get(zona) || new Set()).size;
-            });
-
-            const zone_top_products = Array.from(usageMap.keys()).map(zona => {
-                const top_products = Array.from(productMap.entries())
-                    .filter(([k]) => k.startsWith(`${zona}||`))
-                    .map(([k, cantidad]) => ({
-                        producto: k.split('||')[1],
-                        cantidad
-                    }))
-                    .sort((a, b) => b.cantidad - a.cantidad)
-                    .slice(0, 5);
-                return { zona, top_products };
-            });
-
-            const sucursal_login_by_zone = Array.from(usageMap.keys()).map(zona => ({
-                zona,
-                sucursales: zonaToSucursales.get(zona) || []
-            }));
-
-            if (sucursal_login_by_zone.length === 0) {
-                sucursal_login_by_zone.push({ zona: 'SIN_ZONA', sucursales: [] });
-            }
+            const sucursal_login_by_zone = Object.keys(sucursal_login_by_zone_map)
+                .sort()
+                .map(zona => ({ zona, sucursales: sucursal_login_by_zone_map[zona] }));
 
             return {
+                total_facturas: sucursal_usage.reduce((acc, r) => acc + Number(r.facturas || 0), 0),
+                total_items: sucursal_usage.reduce((acc, r) => acc + Number(r.items || 0), 0),
                 avg_completion_minutes_overall: 0,
-                total_completed_orders: completedOrders,
-                zona_usage: Array.from(usageMap.values()),
-                zone_top_products,
+                total_completed_orders: 0,
+                last_login: null,
+                top_products: [],
+                low_products: [],
+                sucursal_usage,
+                zona_usage,
+                zone_top_products: [],
                 sucursal_login_by_zone,
-                _source: 'fallback'
+                source: 'fallback_live_queue'
             };
         }
 
