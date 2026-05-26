@@ -1102,6 +1102,8 @@
                             <div class="labels-mini-title">Zonas / Sucursales con Uso</div>
                             <div id="labelsTopZona" class="labels-mini-value">-</div>
                             <div id="labelsUsageCounts" style="font-size: 0.84rem; color: #5e7287; margin-top: 2px;">-</div>
+                            <div id="labelsAvgCompletion" style="font-size: 0.84rem; color: #325172; margin-top: 6px; font-weight: 700;">Promedio finalización: -</div>
+                            <div id="labelsCompletedOrders" style="font-size: 0.82rem; color: #5e7287; margin-top: 2px;">Órdenes finalizadas: -</div>
                         </div>
                     </div>
 
@@ -1111,6 +1113,27 @@
                         </div>
                         <div class="labels-chart-wrap">
                             <canvas id="labelsTopSucursalesChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="labels-grid-2" style="margin-bottom: 14px;">
+                        <div class="labels-chart-wrap">
+                            <canvas id="labelsCompletionByZoneChart"></canvas>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0 0 8px; font-size: 0.9rem; color: #325172;">Productos Más Trabajados por Zona</h4>
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background: #f5f5f5;">
+                                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Zona</th>
+                                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Producto</th>
+                                        <th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Cantidad</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="labelsZoneTopProductsBody">
+                                    <tr><td colspan="3" style="text-align: center; padding: 10px; border: 1px solid #ddd;">Cargando...</td></tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
@@ -1140,6 +1163,24 @@
                             </thead>
                             <tbody id="labelsSucursalUsageBody">
                                 <tr><td colspan="4" style="text-align: center; padding: 10px; border: 1px solid #ddd;">Cargando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div style="margin-top: 16px;">
+                        <h4 style="margin: 0 0 8px; font-size: 0.9rem; color: #325172;">Todas las Sucursales por Zona y Último Login</h4>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: #f5f5f5;">
+                                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Zona</th>
+                                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Sucursal</th>
+                                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Último Login</th>
+                                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Usuario</th>
+                                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Producto Más Trabajado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="labelsSucursalLoginByZoneBody">
+                                <tr><td colspan="5" style="text-align: center; padding: 10px; border: 1px solid #ddd;">Cargando...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1737,6 +1778,7 @@ let estadoUsuariosChart = null;
 let loginActivityRefreshInterval = null;  // Intervalo para actualización automática
 let labelsZonaUsageChart = null;
 let labelsTopSucursalesChart = null;
+let labelsCompletionByZoneChart = null;
 let labelsMetricsCache = null;
 let labelsMetricsLoading = false;
 let labelsLastRenderSignature = '';
@@ -1903,6 +1945,87 @@ function renderLabelsUsageTable(rows) {
     )).join('');
 }
 
+function formatDateTimeSafe(isoText) {
+    if (!isoText) return 'Sin registro';
+    const dt = new Date(isoText);
+    if (Number.isNaN(dt.getTime())) return 'Sin registro';
+    return `${dt.toLocaleDateString('es-DO')} ${dt.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+function renderZoneTopProductsTable(data, selectedZona) {
+    const body = document.getElementById('labelsZoneTopProductsBody');
+    if (!body) return;
+
+    let rows = (data.zone_top_products || []).map(z => ({
+        zona: toSubtabZoneKey(z.zona),
+        top_products: z.top_products || []
+    }));
+    if (selectedZona && selectedZona !== 'ALL') {
+        rows = rows.filter(r => r.zona === selectedZona);
+    }
+
+    const flat = [];
+    rows.forEach(zone => {
+        (zone.top_products || []).slice(0, 3).forEach(p => {
+            flat.push({ zona: zone.zona, producto: p.producto || 'N/A', cantidad: Number(p.cantidad || 0) });
+        });
+    });
+
+    if (!flat.length) {
+        body.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 10px; border: 1px solid #ddd;">Sin datos</td></tr>';
+        return;
+    }
+
+    body.innerHTML = flat.map(r => (
+        `<tr>` +
+        `<td style="padding: 8px; border: 1px solid #ddd;">${zoneKeyToLabel(r.zona)}</td>` +
+        `<td style="padding: 8px; border: 1px solid #ddd;">${r.producto}</td>` +
+        `<td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${r.cantidad}</td>` +
+        `</tr>`
+    )).join('');
+}
+
+function renderSucursalLoginByZoneTable(data, selectedZona) {
+    const body = document.getElementById('labelsSucursalLoginByZoneBody');
+    if (!body) return;
+
+    let groups = (data.sucursal_login_by_zone || []).map(g => ({
+        zona: toSubtabZoneKey(g.zona),
+        sucursales: g.sucursales || []
+    }));
+    if (selectedZona && selectedZona !== 'ALL') {
+        groups = groups.filter(g => g.zona === selectedZona);
+    }
+
+    const flat = [];
+    groups.forEach(group => {
+        (group.sucursales || []).forEach(s => {
+            flat.push({
+                zona: group.zona,
+                sucursal: s.sucursal || 'N/A',
+                ultimo_login: s.ultimo_login || null,
+                ultimo_login_username: s.ultimo_login_username || '-',
+                top_producto: (s.top_producto && s.top_producto.producto) ? `${s.top_producto.producto} (${Number(s.top_producto.cantidad || 0)})` : 'Sin datos'
+            });
+        });
+    });
+
+    if (!flat.length) {
+        body.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 10px; border: 1px solid #ddd;">Sin datos</td></tr>';
+        return;
+    }
+
+    body.innerHTML = flat.map(r => (
+        `<tr>` +
+        `<td style="padding: 10px; border: 1px solid #ddd;">${zoneKeyToLabel(r.zona)}</td>` +
+        `<td style="padding: 10px; border: 1px solid #ddd;">${r.sucursal}</td>` +
+        `<td style="padding: 10px; border: 1px solid #ddd;">${formatDateTimeSafe(r.ultimo_login)}</td>` +
+        `<td style="padding: 10px; border: 1px solid #ddd;">${r.ultimo_login_username}</td>` +
+        `<td style="padding: 10px; border: 1px solid #ddd;">${r.top_producto}</td>` +
+        `</tr>`
+    )).join('');
+}
+
 function renderLabelsCharts(data, selectedZona) {
     if (typeof Chart === 'undefined') return;
 
@@ -2000,6 +2123,60 @@ function renderLabelsCharts(data, selectedZona) {
             }
         });
     }
+
+    const completionCanvas = document.getElementById('labelsCompletionByZoneChart');
+    if (completionCanvas) {
+        const zoneRows = (data.zona_usage || []).map(z => ({
+            zona: toSubtabZoneKey(z.zona),
+            avg_completion_minutes: Number(z.avg_completion_minutes || 0),
+            ordenes_finalizadas: Number(z.ordenes_finalizadas || 0)
+        }));
+
+        if (labelsCompletionByZoneChart) labelsCompletionByZoneChart.destroy();
+        labelsCompletionByZoneChart = new Chart(completionCanvas, {
+            type: 'bar',
+            data: {
+                labels: zoneRows.map(z => zoneKeyToLabel(z.zona)),
+                datasets: [
+                    {
+                        label: 'Promedio finalización (min)',
+                        data: zoneRows.map(z => z.avg_completion_minutes),
+                        backgroundColor: '#f59e0b',
+                        borderRadius: 8,
+                        maxBarThickness: 36
+                    },
+                    {
+                        label: 'Órdenes finalizadas',
+                        type: 'line',
+                        data: zoneRows.map(z => z.ordenes_finalizadas),
+                        borderColor: '#0f766e',
+                        backgroundColor: 'rgba(15, 118, 110, 0.18)',
+                        borderWidth: 3,
+                        tension: 0.3,
+                        pointRadius: 4,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    title: { display: true, text: 'Tiempo Promedio de Finalización por Zona' }
+                },
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: 'Minutos' } },
+                    y1: {
+                        beginAtZero: true,
+                        position: 'right',
+                        grid: { drawOnChartArea: false },
+                        title: { display: true, text: 'Órdenes' }
+                    }
+                }
+            }
+        });
+    }
 }
 
 function updateLabelsZoneView() {
@@ -2017,10 +2194,19 @@ function updateLabelsZoneView() {
     const itemsEl = document.getElementById('labelsItemsTotal');
     const topZonaEl = document.getElementById('labelsTopZona');
     const countsEl = document.getElementById('labelsUsageCounts');
+    const avgCompEl = document.getElementById('labelsAvgCompletion');
+    const completedEl = document.getElementById('labelsCompletedOrders');
     if (facturasEl) facturasEl.textContent = Number(facturasTotal || 0);
     if (itemsEl) itemsEl.textContent = Number(itemsTotal || 0);
     if (topZonaEl) topZonaEl.textContent = selectedZona === 'ALL' ? 'General' : zoneKeyToLabel(selectedZona);
     if (countsEl) countsEl.textContent = `${zonasActivas} zonas / ${filteredRows.length} sucursales`;
+    const selectedZoneRows = (labelsMetricsCache.zona_usage || []).filter(z => selectedZona === 'ALL' || toSubtabZoneKey(z.zona) === selectedZona);
+    const totalCompleted = selectedZoneRows.reduce((acc, z) => acc + Number(z.ordenes_finalizadas || 0), 0);
+    const weightedAvgComp = totalCompleted
+        ? selectedZoneRows.reduce((acc, z) => acc + (Number(z.avg_completion_minutes || 0) * Number(z.ordenes_finalizadas || 0)), 0) / totalCompleted
+        : Number(labelsMetricsCache.avg_completion_minutes_overall || 0);
+    if (avgCompEl) avgCompEl.textContent = `Promedio finalización: ${Number(weightedAvgComp || 0).toFixed(2)} min`;
+    if (completedEl) completedEl.textContent = `Órdenes finalizadas: ${Number(totalCompleted || 0)}`;
 
     const signature = [
         selectedZona,
@@ -2033,6 +2219,8 @@ function updateLabelsZoneView() {
     labelsLastRenderSignature = signature;
 
     renderLabelsUsageTable(filteredRows);
+    renderZoneTopProductsTable(labelsMetricsCache, selectedZona);
+    renderSucursalLoginByZoneTable(labelsMetricsCache, selectedZona);
     if (shouldRedrawCharts) {
         renderLabelsCharts(labelsMetricsCache, selectedZona);
     }
@@ -2126,11 +2314,15 @@ async function buildFallbackLabelsMetrics() {
     return {
         total_facturas,
         total_items,
+        avg_completion_minutes_overall: 0,
+        total_completed_orders: 0,
         last_login: null,
         top_products: [],
         low_products: [],
         sucursal_usage,
         zona_usage,
+        zone_top_products: [],
+        sucursal_login_by_zone: [],
         sucursal_mas_uso: sucursal_usage[0] || null,
         sucursal_menos_uso: sucursal_usage[sucursal_usage.length - 1] || null,
         zona_mas_uso: zona_usage[0] || null,

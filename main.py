@@ -2483,7 +2483,9 @@ async def labelsapp_usage_metrics(product_limit: int = 5, db=Depends(get_db)):
         tables = [r[0] for r in cur.fetchall() if r and r[0]]
 
         product_totals = defaultdict(int)
+        product_totals_by_sucursal = defaultdict(lambda: defaultdict(int))
         sucursal_totals = {}
+        completion_by_sucursal = defaultdict(lambda: {"total_min": 0.0, "count": 0})
         total_facturas = 0
         total_items = 0
 
@@ -2559,10 +2561,29 @@ async def labelsapp_usage_metrics(product_limit: int = 5, db=Depends(get_db)):
                     product_name = (producto or "").strip()
                     if not product_name:
                         continue
-                    product_totals[product_name] += int(qty or 0)
+                    qty_i = int(qty or 0)
+                    product_totals[product_name] += qty_i
+                    product_totals_by_sucursal[sucursal_slug][product_name] += qty_i
+
+            if "fecha_creacion" in table_columns and "fecha_completado" in table_columns:
+                cur.execute(
+                    f"""
+                    SELECT
+                        COALESCE(SUM(EXTRACT(EPOCH FROM (fecha_completado - fecha_creacion)) / 60.0), 0) AS total_min,
+                        COUNT(*) AS cnt
+                    FROM {table_name}
+                    WHERE fecha_creacion IS NOT NULL
+                      AND fecha_completado IS NOT NULL
+                      AND TRIM(COALESCE(estado, '')) IN ('Finalizado', 'Completado')
+                    """
+                )
+                comp_row = cur.fetchone() or (0, 0)
+                completion_by_sucursal[sucursal_slug]["total_min"] += float(comp_row[0] or 0)
+                completion_by_sucursal[sucursal_slug]["count"] += int(comp_row[1] or 0)
 
         # Mapa de sucursal_slug -> metadatos reales
         slug_to_meta = {}
+        all_sucursales_meta = []
         try:
             cur.execute("SELECT nombre, zona FROM sucursales")
             for row in cur.fetchall() or []:
@@ -2570,32 +2591,54 @@ async def labelsapp_usage_metrics(product_limit: int = 5, db=Depends(get_db)):
                 if not suc_name:
                     continue
                 zona = _normalize_zona_key(row[1] or "")
-                slug_to_meta[_normalize_sucursal_slug(suc_name)] = {
+                slug = _normalize_sucursal_slug(suc_name)
+                item = {
                     "nombre": suc_name,
                     "zona": zona,
+                    "slug": slug,
                 }
+                slug_to_meta[slug] = item
+                all_sucursales_meta.append(item)
         except Exception:
             slug_to_meta = {}
+            all_sucursales_meta = []
 
         sucursal_usage = []
         for slug, data in sucursal_totals.items():
             suc_meta = slug_to_meta.get(slug, {})
             zona = suc_meta.get("zona") or "Sin_Zona"
+            comp = completion_by_sucursal.get(slug, {"total_min": 0.0, "count": 0})
+            avg_completion = (comp["total_min"] / comp["count"]) if comp["count"] else 0.0
+            top_product = None
+            top_by_suc = product_totals_by_sucursal.get(slug, {})
+            if top_by_suc:
+                p_name, p_qty = max(top_by_suc.items(), key=lambda x: (x[1], x[0].lower()))
+                top_product = {"producto": p_name, "cantidad": int(p_qty)}
             sucursal_usage.append({
                 "sucursal": suc_meta.get("nombre") or slug.replace("_", " ").title(),
                 "sucursal_slug": slug,
                 "zona": zona,
                 "facturas": data["facturas"],
                 "items": data["items"],
+                "avg_completion_minutes": round(avg_completion, 2),
+                "ordenes_finalizadas": int(comp["count"]),
+                "top_producto": top_product,
             })
         sucursal_usage.sort(key=lambda x: (-x["facturas"], -x["items"], x["sucursal"]))
 
-        zona_totals = defaultdict(lambda: {"facturas": 0, "items": 0, "sucursales": 0})
+        zona_totals = defaultdict(lambda: {"facturas": 0, "items": 0, "sucursales": 0, "total_min": 0.0, "finalizadas": 0})
+        zone_products = defaultdict(lambda: defaultdict(int))
         for row in sucursal_usage:
             zona = _normalize_zona_key(row.get("zona") or "")
             zona_totals[zona]["facturas"] += int(row.get("facturas") or 0)
             zona_totals[zona]["items"] += int(row.get("items") or 0)
             zona_totals[zona]["sucursales"] += 1
+            zona_totals[zona]["total_min"] += float(row.get("avg_completion_minutes") or 0) * int(row.get("ordenes_finalizadas") or 0)
+            zona_totals[zona]["finalizadas"] += int(row.get("ordenes_finalizadas") or 0)
+
+            suc_slug = row.get("sucursal_slug")
+            for prod_name, qty in (product_totals_by_sucursal.get(suc_slug, {}) or {}).items():
+                zone_products[zona][prod_name] += int(qty or 0)
 
         zona_usage = [
             {
@@ -2603,10 +2646,28 @@ async def labelsapp_usage_metrics(product_limit: int = 5, db=Depends(get_db)):
                 "facturas": int(v["facturas"]),
                 "items": int(v["items"]),
                 "sucursales": int(v["sucursales"]),
+                "avg_completion_minutes": round((float(v["total_min"]) / int(v["finalizadas"])) if int(v["finalizadas"]) else 0.0, 2),
+                "ordenes_finalizadas": int(v["finalizadas"]),
             }
             for z, v in zona_totals.items()
         ]
         zona_usage.sort(key=lambda x: (-x["facturas"], -x["items"], x["zona"]))
+
+        zone_top_products = []
+        for zona, products_map in zone_products.items():
+            ranked = sorted(
+                [{"producto": p, "cantidad": int(q)} for p, q in products_map.items() if int(q or 0) > 0],
+                key=lambda x: (-x["cantidad"], x["producto"].lower())
+            )
+            zone_top_products.append({
+                "zona": zona,
+                "top_products": ranked[:safe_limit]
+            })
+        zone_top_products.sort(key=lambda x: x["zona"])
+
+        total_completion_min = sum(float(v.get("total_min") or 0) for v in zona_totals.values())
+        total_completed_orders = sum(int(v.get("finalizadas") or 0) for v in zona_totals.values())
+        avg_completion_minutes_overall = round((total_completion_min / total_completed_orders) if total_completed_orders else 0.0, 2)
 
         product_usage = [
             {"producto": k, "cantidad": int(v)}
@@ -2618,6 +2679,7 @@ async def labelsapp_usage_metrics(product_limit: int = 5, db=Depends(get_db)):
         low_products = sorted(product_usage, key=lambda x: (x["cantidad"], x["producto"].lower()))[:safe_limit]
 
         last_login = None
+        latest_login_by_sucursal = {}
         try:
             cur.execute(
                 """
@@ -2636,17 +2698,65 @@ async def labelsapp_usage_metrics(product_limit: int = 5, db=Depends(get_db)):
                     "sucursal": last_login_row[3],
                     "fecha_hora_login": last_login_row[4].isoformat() if last_login_row[4] else None,
                 }
+
+            cur.execute(
+                """
+                SELECT DISTINCT ON (LOWER(TRIM(COALESCE(sucursal, ''))))
+                       username, sucursal, fecha_hora_login
+                FROM login_audits
+                WHERE TRIM(COALESCE(sucursal, '')) <> ''
+                ORDER BY LOWER(TRIM(COALESCE(sucursal, ''))), fecha_hora_login DESC
+                """
+            )
+            for u, suc, dt in cur.fetchall() or []:
+                key = _normalize_sucursal_slug(suc or "")
+                latest_login_by_sucursal[key] = {
+                    "username": u,
+                    "fecha_hora_login": dt.isoformat() if dt else None,
+                }
         except Exception:
             last_login = None
+            latest_login_by_sucursal = {}
+
+        sucursal_map_usage = {row.get("sucursal_slug"): row for row in sucursal_usage}
+        sucursal_login_by_zone = defaultdict(list)
+        all_zone_order = set()
+        for meta in all_sucursales_meta:
+            slug = meta.get("slug")
+            zona = meta.get("zona") or "Sin_Zona"
+            all_zone_order.add(zona)
+            usage = sucursal_map_usage.get(slug, {})
+            login = latest_login_by_sucursal.get(slug, {})
+            sucursal_login_by_zone[zona].append({
+                "sucursal": meta.get("nombre"),
+                "sucursal_slug": slug,
+                "zona": zona,
+                "ultimo_login": login.get("fecha_hora_login"),
+                "ultimo_login_username": login.get("username"),
+                "facturas": int(usage.get("facturas") or 0),
+                "items": int(usage.get("items") or 0),
+                "avg_completion_minutes": round(float(usage.get("avg_completion_minutes") or 0.0), 2),
+                "ordenes_finalizadas": int(usage.get("ordenes_finalizadas") or 0),
+                "top_producto": usage.get("top_producto"),
+            })
+
+        sucursal_login_by_zone_list = []
+        for z in sorted(all_zone_order):
+            rows = sorted(sucursal_login_by_zone.get(z, []), key=lambda x: (x.get("sucursal") or "").lower())
+            sucursal_login_by_zone_list.append({"zona": z, "sucursales": rows})
 
         return {
             "total_facturas": total_facturas,
             "total_items": total_items,
+            "avg_completion_minutes_overall": avg_completion_minutes_overall,
+            "total_completed_orders": int(total_completed_orders),
             "last_login": last_login,
             "top_products": top_products,
             "low_products": low_products,
             "sucursal_usage": sucursal_usage,
             "zona_usage": zona_usage,
+            "zone_top_products": zone_top_products,
+            "sucursal_login_by_zone": sucursal_login_by_zone_list,
             "sucursal_mas_uso": sucursal_usage[0] if sucursal_usage else None,
             "sucursal_menos_uso": sucursal_usage[-1] if sucursal_usage else None,
             "zona_mas_uso": zona_usage[0] if zona_usage else None,
