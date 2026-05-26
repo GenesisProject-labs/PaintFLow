@@ -434,6 +434,65 @@
             box-shadow: 0 12px 40px rgba(0,0,0,0.25);
             animation: slideIn 0.3s ease;
         }
+
+        .dashboard-modal-content {
+            max-width: 1200px;
+            width: 96%;
+            max-height: 92vh;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .dashboard-grid-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .dashboard-grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 14px;
+        }
+
+        .dashboard-card {
+            padding: 12px;
+            border: 1px solid #dce8f8;
+            border-radius: 10px;
+            background: #f8fbff;
+        }
+
+        .dashboard-card-label {
+            font-size: 0.82rem;
+            color: #5e7287;
+        }
+
+        .dashboard-card-value {
+            font-weight: 700;
+            color: #15395b;
+            margin-top: 4px;
+            font-size: 1.1rem;
+        }
+
+        .dashboard-chart-wrap {
+            height: 320px;
+            padding: 12px;
+            border: 1px solid #dce8f8;
+            border-radius: 10px;
+            background: #ffffff;
+        }
+
+        @media (max-width: 980px) {
+            .dashboard-grid-4 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .dashboard-grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
         
         @keyframes slideIn {
             from { 
@@ -981,6 +1040,7 @@
                         <input type="text" class="search-input" placeholder="Nombre o código del empleado..." id="searchInput" oninput="filterEmployees()">
                         <button class="btn btn-secondary" onclick="clearSearch()">✕ Limpiar</button>
                     </div>
+                    <button class="btn btn-primary" onclick="abrirDashboardAnalista()">📊 Dashboard Analista</button>
                     <button class="btn btn-success" onclick="abrirModalEmpleado()">👥 Agregar Empleado</button>
                 </div>
                 <div class="subtabs-container" id="subtabsContainer"></div>
@@ -1037,6 +1097,81 @@
         </div>
     </div>
 
+    <div id="modalDashboardAnalista" class="modal">
+        <div class="modal-content dashboard-modal-content">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:10px;">
+                <h2 style="margin:0;">Dashboard de Analista</h2>
+                <button class="btn-cancel" onclick="cerrarDashboardAnalista()">Cerrar</button>
+            </div>
+
+            <div class="dashboard-grid-4">
+                <div class="dashboard-card">
+                    <div class="dashboard-card-label">Sucursales Activas</div>
+                    <div id="analystTotalSucursales" class="dashboard-card-value">0</div>
+                </div>
+                <div class="dashboard-card">
+                    <div class="dashboard-card-label">Empleados Activos</div>
+                    <div id="analystTotalEmpleadosActivos" class="dashboard-card-value">0</div>
+                </div>
+                <div class="dashboard-card">
+                    <div class="dashboard-card-label">Promedio Finalización</div>
+                    <div id="analystAvgCompletion" class="dashboard-card-value">0 min</div>
+                </div>
+                <div class="dashboard-card">
+                    <div class="dashboard-card-label">Órdenes Finalizadas</div>
+                    <div id="analystCompletedOrders" class="dashboard-card-value">0</div>
+                </div>
+            </div>
+
+            <div class="dashboard-grid-2">
+                <div class="dashboard-chart-wrap">
+                    <canvas id="analystZoneUsageChart"></canvas>
+                </div>
+                <div class="dashboard-chart-wrap">
+                    <canvas id="analystCompletionChart"></canvas>
+                </div>
+            </div>
+
+            <div class="dashboard-grid-2">
+                <div>
+                    <h4 style="margin: 0 0 8px; font-size: 0.95rem; color: #325172;">Productos Más Trabajados por Zona</h4>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #f5f5f5;">
+                                <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Zona</th>
+                                <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Producto</th>
+                                <th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Cantidad</th>
+                            </tr>
+                        </thead>
+                        <tbody id="analystZoneTopProductsBody">
+                            <tr><td colspan="3" style="text-align: center; padding: 10px; border: 1px solid #ddd;">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div>
+                    <h4 style="margin: 0 0 8px; font-size: 0.95rem; color: #325172;">Sucursales por Zona y Último Login</h4>
+                    <div style="max-height: 320px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: #f5f5f5; position: sticky; top: 0;">
+                                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Zona</th>
+                                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Sucursal</th>
+                                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Último Login</th>
+                                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Usuario</th>
+                                </tr>
+                            </thead>
+                            <tbody id="analystSucursalLoginBody">
+                                <tr><td colspan="4" style="text-align: center; padding: 10px; border: 1px solid #ddd;">Cargando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="analystDashboardStatus" style="font-size: 0.85rem; color: #5e7287; min-height: 18px;"></div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
@@ -1045,7 +1180,7 @@
         let allEmpleados = [];
         let allSucursales = [];
         let sucursalesUnicas = [];
-        let activeSucursal = 'Dashboard'; // Para guardar la pestaña activa
+        let activeSucursal = 'Alameda'; // Para guardar la pestaña activa
         let analystMetricsCache = null;
         let analystZoneUsageChart = null;
         let analystCompletionChart = null;
@@ -1083,9 +1218,6 @@
                 extraerSucursalesUnicas();
                 renderSubtabs();
                 renderEmpleadosPorSucursal();
-                if (activeSucursal === 'Dashboard') {
-                    loadAnalystDashboardData();
-                }
             } catch (err) {
                 console.error('Error loading data:', err);
             }
@@ -1124,16 +1256,13 @@
             const container = document.getElementById('subtabsContainer');
             container.innerHTML = '';
 
-            const dashBtn = document.createElement('button');
-            dashBtn.className = 'subtab-btn' + (activeSucursal === 'Dashboard' ? ' active' : '');
-            dashBtn.textContent = '📊 Dashboard';
-            dashBtn.onclick = (event) => switchSucursal(event, 'Dashboard');
-            container.appendChild(dashBtn);
+            if (!sucursalesUnicas.includes(activeSucursal)) {
+                activeSucursal = sucursalesUnicas[0] || 'Alameda';
+            }
             
-            sucursalesUnicas.forEach((sucursal, index) => {
+            sucursalesUnicas.forEach((sucursal) => {
                 const btn = document.createElement('button');
-                const isActive = activeSucursal === sucursal || (activeSucursal !== 'Dashboard' && index === 0 && !sucursalesUnicas.includes(activeSucursal));
-                btn.className = 'subtab-btn' + (isActive ? ' active' : '');
+                btn.className = 'subtab-btn' + (activeSucursal === sucursal ? ' active' : '');
                 btn.textContent = sucursal;
                 btn.onclick = () => switchSucursal(event, sucursal);
                 container.appendChild(btn);
@@ -1153,78 +1282,6 @@
         function renderEmpleadosPorSucursal() {
             const container = document.getElementById('tablasContainer');
             container.innerHTML = '';
-
-            const dashboardDiv = document.createElement('div');
-            dashboardDiv.id = 'sucursal-Dashboard';
-            dashboardDiv.className = 'subtab-content' + (activeSucursal === 'Dashboard' ? ' active' : '');
-            dashboardDiv.innerHTML = `
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px;">
-                    <div style="padding: 12px; border: 1px solid #dce8f8; border-radius: 10px; background: #f8fbff;">
-                        <div style="font-size: 0.82rem; color: #5e7287;">Sucursales Activas</div>
-                        <div id="analystTotalSucursales" style="font-weight: 700; color: #15395b; margin-top: 4px; font-size: 1.1rem;">0</div>
-                    </div>
-                    <div style="padding: 12px; border: 1px solid #dce8f8; border-radius: 10px; background: #f8fbff;">
-                        <div style="font-size: 0.82rem; color: #5e7287;">Empleados Activos</div>
-                        <div id="analystTotalEmpleadosActivos" style="font-weight: 700; color: #15395b; margin-top: 4px; font-size: 1.1rem;">0</div>
-                    </div>
-                    <div style="padding: 12px; border: 1px solid #dce8f8; border-radius: 10px; background: #f8fbff;">
-                        <div style="font-size: 0.82rem; color: #5e7287;">Promedio Finalización</div>
-                        <div id="analystAvgCompletion" style="font-weight: 700; color: #15395b; margin-top: 4px; font-size: 1.1rem;">0 min</div>
-                    </div>
-                    <div style="padding: 12px; border: 1px solid #dce8f8; border-radius: 10px; background: #f8fbff;">
-                        <div style="font-size: 0.82rem; color: #5e7287;">Órdenes Finalizadas</div>
-                        <div id="analystCompletedOrders" style="font-weight: 700; color: #15395b; margin-top: 4px; font-size: 1.1rem;">0</div>
-                    </div>
-                </div>
-
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 14px;">
-                    <div style="height: 320px; padding: 12px; border: 1px solid #dce8f8; border-radius: 10px; background: #ffffff;">
-                        <canvas id="analystZoneUsageChart"></canvas>
-                    </div>
-                    <div style="height: 320px; padding: 12px; border: 1px solid #dce8f8; border-radius: 10px; background: #ffffff;">
-                        <canvas id="analystCompletionChart"></canvas>
-                    </div>
-                </div>
-
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 14px;">
-                    <div>
-                        <h4 style="margin: 0 0 8px; font-size: 0.95rem; color: #325172;">Productos Más Trabajados por Zona</h4>
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <thead>
-                                <tr style="background: #f5f5f5;">
-                                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Zona</th>
-                                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Producto</th>
-                                    <th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Cantidad</th>
-                                </tr>
-                            </thead>
-                            <tbody id="analystZoneTopProductsBody">
-                                <tr><td colspan="3" style="text-align: center; padding: 10px; border: 1px solid #ddd;">Cargando...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div>
-                        <h4 style="margin: 0 0 8px; font-size: 0.95rem; color: #325172;">Sucursales por Zona y Último Login</h4>
-                        <div style="max-height: 320px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px;">
-                            <table style="width: 100%; border-collapse: collapse;">
-                                <thead>
-                                    <tr style="background: #f5f5f5; position: sticky; top: 0;">
-                                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Zona</th>
-                                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Sucursal</th>
-                                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Último Login</th>
-                                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Usuario</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="analystSucursalLoginBody">
-                                    <tr><td colspan="4" style="text-align: center; padding: 10px; border: 1px solid #ddd;">Cargando...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="analystDashboardStatus" style="font-size: 0.85rem; color: #5e7287; min-height: 18px;"></div>
-            `;
-            container.appendChild(dashboardDiv);
             
             sucursalesUnicas.forEach((sucursal, index) => {
                 const empleadosSucursal = allEmpleados.filter(e => e.sucursal_nombre === sucursal);
@@ -1395,6 +1452,19 @@
                 if (status) status.textContent = err.message || 'Error cargando métricas';
             }
         }
+
+        function abrirDashboardAnalista() {
+            const modal = document.getElementById('modalDashboardAnalista');
+            if (!modal) return;
+            modal.classList.add('active');
+            loadAnalystDashboardData();
+        }
+
+        function cerrarDashboardAnalista() {
+            const modal = document.getElementById('modalDashboardAnalista');
+            if (!modal) return;
+            modal.classList.remove('active');
+        }
         
         function switchSucursal(event, sucursal) {
             activeSucursal = sucursal; // Guardar sucursal activa
@@ -1407,14 +1477,6 @@
                 content.classList.remove('active');
             });
             document.getElementById('sucursal-' + sucursal.replace(/\s+/g, '-')).classList.add('active');
-
-            if (sucursal === 'Dashboard') {
-                if (analystMetricsCache) {
-                    renderAnalystDashboard(analystMetricsCache);
-                } else {
-                    loadAnalystDashboardData();
-                }
-            }
         }
         
         function switchInactivos(event) {
@@ -1737,6 +1799,16 @@
         document.addEventListener('click', function(e) {
             const modalPerfil = document.getElementById('modalPerfil');
             const modalPassword = document.getElementById('modalPassword');
+            const modalDashboardAnalista = document.getElementById('modalDashboardAnalista');
+            const modalEmpleado = document.getElementById('modalEmpleado');
+
+            if (modalEmpleado && e.target === modalEmpleado) {
+                cerrarModalEmpleado();
+            }
+
+            if (modalDashboardAnalista && e.target === modalDashboardAnalista) {
+                cerrarDashboardAnalista();
+            }
             
             if (modalPerfil && e.target === modalPerfil) {
                 cerrarModalPerfil();
@@ -1750,8 +1822,20 @@
         // Cerrar modales con tecla Escape
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
+                const modalEmpleado = document.getElementById('modalEmpleado');
+                const modalDashboardAnalista = document.getElementById('modalDashboardAnalista');
                 const modalPerfil = document.getElementById('modalPerfil');
                 const modalPassword = document.getElementById('modalPassword');
+
+                if (modalEmpleado && modalEmpleado.classList.contains('active')) {
+                    cerrarModalEmpleado();
+                    return;
+                }
+
+                if (modalDashboardAnalista && modalDashboardAnalista.classList.contains('active')) {
+                    cerrarDashboardAnalista();
+                    return;
+                }
                 
                 if (modalPassword && modalPassword.classList.contains('active')) {
                     cerrarModalPassword();
