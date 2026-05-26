@@ -1598,11 +1598,6 @@
                 productInput.value = displayProduct;
             }
 
-            const forcedCode = forcedCodeForProductName(displayProduct);
-            if (forcedCode) {
-                document.getElementById("codigo").value = forcedCode;
-            }
-
             const product = normalize(displayProduct);
             const base = normalize(document.getElementById("base").value);
 
@@ -1656,10 +1651,7 @@
                     const canonicalName = canonicalProductName(originalName);
                     const displayName = PRODUCT_DISPLAY_BY_CANON[canonicalName] || originalName;
 
-                    let code = (p.codigo || "").toString().trim();
-                    if (canonicalName === "texturizado") {
-                        code = PRODUCT_FORCED_CODE_BY_CANON.texturizado;
-                    }
+                    const code = (p.codigo || "").toString().trim();
 
                     if (!code) continue;
 
@@ -1684,24 +1676,6 @@
 
                     productNames.add(displayName);
 
-                }
-
-                if (!productByCode.has(PRODUCT_FORCED_CODE_BY_CANON.texturizado)) {
-                    const forcedCode = PRODUCT_FORCED_CODE_BY_CANON.texturizado;
-                    const forcedName = PRODUCT_DISPLAY_BY_CANON.texturizado;
-                    productByCode.set(forcedCode, {
-                        codigo: forcedCode,
-                        nombre: forcedName,
-                        base: "",
-                        ubicacion: ""
-                    });
-                    codeIndex.push({
-                        code: forcedCode,
-                        codeNorm: normalize(forcedCode),
-                        name: forcedName,
-                        nameNorm: normalize(forcedName),
-                    });
-                    productNames.add(forcedName);
                 }
 
                 setProductOptions(Array.from(productNames).filter(Boolean).sort((a, b) => a.localeCompare(b, "es")));
@@ -2083,7 +2057,6 @@
             const forcedByProduct = forcedCodeForProductName(producto);
             if (forcedByProduct) {
                 document.getElementById("codigoBase").value = forcedByProduct;
-                document.getElementById("codigo").value = forcedByProduct;
                 return;
             }
 
