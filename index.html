@@ -1782,6 +1782,8 @@ let labelsCompletionByZoneChart = null;
 let labelsMetricsCache = null;
 let labelsMetricsLoading = false;
 let labelsLastRenderSignature = '';
+let labelsMetricsInFlight = null;
+let labelsLastFetchMs = 0;
 
 // Función para actualizar gráficas del dashboard
 function updateDashboardCharts() {
@@ -2272,31 +2274,43 @@ async function mapWithConcurrency(items, limit, mapper) {
 }
 
 async function buildFallbackLabelsMetrics() {
-    const sucRes = await fetchWithTimeout(API + '/api/v1/sucursales', 5000);
-    if (!sucRes.ok) throw new Error('No se pudo consultar sucursales para fallback');
-    const sucData = await sucRes.json();
-    const sucursales = Array.isArray(sucData.sucursales) ? sucData.sucursales : [];
+    let sucursales = Array.isArray(allSucursales) ? allSucursales : [];
+    if (!sucursales.length) {
+        const sucRes = await fetchWithTimeout(API + '/api/v1/sucursales', 3000);
+        if (sucRes.ok) {
+            const sucData = await sucRes.json();
+            sucursales = Array.isArray(sucData.sucursales) ? sucData.sucursales : [];
+        }
+    }
 
     const filteredSucursales = sucursales.filter(s => (s && (s.nombre || '').trim()));
+    const sucursalUsageMap = {};
 
-    const requests = await mapWithConcurrency(filteredSucursales, 4, async suc => {
-        const sucursalNombre = suc.nombre || 'N/A';
-        const zona = toSubtabZoneKey(suc.zona || getZonaFromSucursalName(sucursalNombre));
-        const slug = normalizeSucursalSlug(sucursalNombre);
-        try {
-            const qRes = await fetchWithTimeout(API + `/api/v1/labelsapp/live-queue?sucursal=${encodeURIComponent(slug)}&limit=250`, 4500);
-            if (!qRes.ok) return { sucursal: sucursalNombre, zona, facturas: 0, items: 0 };
+    // Fallback rapido: una sola llamada global, agregando localmente por sucursal/zona.
+    try {
+        const qRes = await fetchWithTimeout(API + '/api/v1/labelsapp/live-queue?limit=500', 2500);
+        if (qRes.ok) {
             const queue = await qRes.json();
-            const items = Array.isArray(queue.items) ? queue.items : [];
-            const facturas = Number(queue.total || items.length || 0);
-            const totalItems = items.reduce((acc, row) => acc + Number(row.items || 0), 0);
-            return { sucursal: sucursalNombre, zona, facturas, items: totalItems };
-        } catch (_) {
-            return { sucursal: sucursalNombre, zona, facturas: 0, items: 0 };
-        }
-    });
+            const items = Array.isArray(queue.items) ? queue.items : (Array.isArray(queue.queue) ? queue.queue : []);
+            items.forEach(row => {
+                const sucursalNombre = (row.sucursal_nombre || row.sucursal || row.tienda || '').toString().trim();
+                if (!sucursalNombre) return;
 
-    const sucursal_usage = requests.filter(r => Number(r.facturas || 0) > 0 || Number(r.items || 0) > 0);
+                const zona = toSubtabZoneKey(row.zona || getZonaFromSucursalName(sucursalNombre));
+                const key = `${sucursalNombre}||${zona}`;
+
+                if (!sucursalUsageMap[key]) {
+                    sucursalUsageMap[key] = { sucursal: sucursalNombre, zona, facturas: 0, items: 0 };
+                }
+
+                sucursalUsageMap[key].facturas += 1;
+                sucursalUsageMap[key].items += Number(row.items || row.cantidad || 1);
+            });
+        }
+    } catch (_) {}
+
+    const sucursal_usage = Object.values(sucursalUsageMap)
+        .filter(r => Number(r.facturas || 0) > 0 || Number(r.items || 0) > 0);
     sucursal_usage.sort((a, b) => (Number(b.facturas || 0) - Number(a.facturas || 0)) || (Number(b.items || 0) - Number(a.items || 0)));
 
     const zonaMap = {};
@@ -2332,80 +2346,103 @@ async function buildFallbackLabelsMetrics() {
 }
 
 async function updateLabelsAppUsageMetrics() {
-    if (labelsMetricsLoading) return;
+    if (labelsMetricsInFlight) return labelsMetricsInFlight;
+    const statusEl = document.getElementById('labelsMetricStatus');
     labelsMetricsLoading = true;
 
-    const statusEl = document.getElementById('labelsMetricStatus');
-    try {
-        const cached = getCachedLabelsMetrics();
-        if (cached) {
-            labelsMetricsCache = cached;
-            updateLabelsZoneSelector(cached);
-            updateLabelsZoneView();
-            if (statusEl) statusEl.textContent = 'Mostrando cache, actualizando datos...';
-        } else if (statusEl) {
-            statusEl.textContent = 'Cargando métricas...';
-        }
-
-        const res = await fetchWithTimeout(API + '/api/v1/labelsapp/usage-metrics?product_limit=5', 5000);
-        if (!res.ok) {
-            let detail = '';
-            try {
-                const body = await res.json();
-                detail = body.detail || '';
-            } catch (_) {}
-            throw new Error(detail || 'No se pudo cargar métricas de LabelsApp');
-        }
-        const data = await res.json();
-        labelsMetricsCache = data;
-        setCachedLabelsMetrics(data);
-
-        const lastLoginEl = document.getElementById('labelsLastLogin');
-
-        if (lastLoginEl) {
-            if (data.last_login && data.last_login.fecha_hora_login) {
-                const dt = new Date(data.last_login.fecha_hora_login);
-                const fecha = dt.toLocaleDateString('es-DO');
-                const hora = dt.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
-                const username = data.last_login.username || 'N/A';
-                lastLoginEl.textContent = `${username} · ${fecha} ${hora}`;
-            } else {
-                lastLoginEl.textContent = 'Sin registros';
-            }
-        }
-
-        renderLabelsProductList('labelsTopProducts', data.top_products || []);
-        renderLabelsProductList('labelsLowProducts', data.low_products || []);
-        updateLabelsZoneSelector(data);
+    const cached = getCachedLabelsMetrics();
+    if (cached) {
+        labelsMetricsCache = cached;
+        updateLabelsZoneSelector(cached);
         updateLabelsZoneView();
 
-        if (statusEl) statusEl.textContent = `Actualizado: ${new Date().toLocaleTimeString('es-DO')}`;
-    } catch (e) {
-        console.error('Error metrics labelsapp:', e);
-        try {
-            const fallbackData = await buildFallbackLabelsMetrics();
-            labelsMetricsCache = fallbackData;
-            setCachedLabelsMetrics(fallbackData);
-            const lastLoginEl = document.getElementById('labelsLastLogin');
-            if (lastLoginEl) lastLoginEl.textContent = 'No disponible (modo live)';
-            renderLabelsProductList('labelsTopProducts', [{ producto: 'No disponible en modo live', cantidad: 0 }]);
-            renderLabelsProductList('labelsLowProducts', [{ producto: 'No disponible en modo live', cantidad: 0 }]);
-            updateLabelsZoneSelector(fallbackData);
-            updateLabelsZoneView();
-            if (statusEl) {
-                statusEl.textContent = `Modo fallback activo: métricas live por zonas (${new Date().toLocaleTimeString('es-DO')})`;
-            }
-        } catch (fallbackError) {
-            const lastLoginEl = document.getElementById('labelsLastLogin');
-            if (lastLoginEl) lastLoginEl.textContent = 'Error cargando métricas';
-            renderLabelsProductList('labelsTopProducts', []);
-            renderLabelsProductList('labelsLowProducts', []);
-            renderLabelsUsageTable([]);
-            if (statusEl) statusEl.textContent = `Error: ${fallbackError.message || e.message || 'No se pudo cargar la vista general'}`;
+        const lastLoginEl = document.getElementById('labelsLastLogin');
+        if (lastLoginEl && cached.last_login && cached.last_login.fecha_hora_login) {
+            const dt = new Date(cached.last_login.fecha_hora_login);
+            const fecha = dt.toLocaleDateString('es-DO');
+            const hora = dt.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
+            const username = cached.last_login.username || 'N/A';
+            lastLoginEl.textContent = `${username} · ${fecha} ${hora}`;
         }
-    } finally {
-        labelsMetricsLoading = false;
+
+        const cacheIsVeryFresh = (Date.now() - labelsLastFetchMs) < 30000;
+        if (cacheIsVeryFresh) {
+            if (statusEl) statusEl.textContent = `Actualizado (cache): ${new Date().toLocaleTimeString('es-DO')}`;
+            labelsMetricsLoading = false;
+            return;
+        }
+
+        if (statusEl) statusEl.textContent = 'Mostrando cache, actualizando datos...';
+    } else if (statusEl) {
+        statusEl.textContent = 'Cargando métricas...';
     }
+
+    labelsMetricsInFlight = (async () => {
+        try {
+            const res = await fetchWithTimeout(API + '/api/v1/labelsapp/usage-metrics?product_limit=5', 3500);
+            if (!res.ok) {
+                let detail = '';
+                try {
+                    const body = await res.json();
+                    detail = body.detail || '';
+                } catch (_) {}
+                throw new Error(detail || 'No se pudo cargar métricas de LabelsApp');
+            }
+            const data = await res.json();
+            labelsMetricsCache = data;
+            setCachedLabelsMetrics(data);
+            labelsLastFetchMs = Date.now();
+
+            const lastLoginEl = document.getElementById('labelsLastLogin');
+            if (lastLoginEl) {
+                if (data.last_login && data.last_login.fecha_hora_login) {
+                    const dt = new Date(data.last_login.fecha_hora_login);
+                    const fecha = dt.toLocaleDateString('es-DO');
+                    const hora = dt.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
+                    const username = data.last_login.username || 'N/A';
+                    lastLoginEl.textContent = `${username} · ${fecha} ${hora}`;
+                } else {
+                    lastLoginEl.textContent = 'Sin registros';
+                }
+            }
+
+            renderLabelsProductList('labelsTopProducts', data.top_products || []);
+            renderLabelsProductList('labelsLowProducts', data.low_products || []);
+            updateLabelsZoneSelector(data);
+            updateLabelsZoneView();
+
+            if (statusEl) statusEl.textContent = `Actualizado: ${new Date().toLocaleTimeString('es-DO')}`;
+        } catch (e) {
+            console.error('Error metrics labelsapp:', e);
+            try {
+                const fallbackData = await buildFallbackLabelsMetrics();
+                labelsMetricsCache = fallbackData;
+                setCachedLabelsMetrics(fallbackData);
+                labelsLastFetchMs = Date.now();
+                const lastLoginEl = document.getElementById('labelsLastLogin');
+                if (lastLoginEl) lastLoginEl.textContent = 'No disponible (modo live)';
+                renderLabelsProductList('labelsTopProducts', [{ producto: 'No disponible en modo live', cantidad: 0 }]);
+                renderLabelsProductList('labelsLowProducts', [{ producto: 'No disponible en modo live', cantidad: 0 }]);
+                updateLabelsZoneSelector(fallbackData);
+                updateLabelsZoneView();
+                if (statusEl) {
+                    statusEl.textContent = `Modo fallback activo: métricas live por zonas (${new Date().toLocaleTimeString('es-DO')})`;
+                }
+            } catch (fallbackError) {
+                const lastLoginEl = document.getElementById('labelsLastLogin');
+                if (lastLoginEl) lastLoginEl.textContent = 'Error cargando métricas';
+                renderLabelsProductList('labelsTopProducts', []);
+                renderLabelsProductList('labelsLowProducts', []);
+                renderLabelsUsageTable([]);
+                if (statusEl) statusEl.textContent = `Error: ${fallbackError.message || e.message || 'No se pudo cargar la vista general'}`;
+            }
+        } finally {
+            labelsMetricsInFlight = null;
+            labelsMetricsLoading = false;
+        }
+    })();
+
+    return labelsMetricsInFlight;
 }
 
 // Función para actualizar gráfica de empleados por sucursal por zona
