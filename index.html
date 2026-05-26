@@ -1275,6 +1275,15 @@ function clearSession() {
     localStorage.removeItem('sessionActive');
 }
 
+function normalizeRole(role) {
+    return (role || '').toString().trim().toLowerCase();
+}
+
+function isStoreRole(role) {
+    const normalized = normalizeRole(role);
+    return normalized === 'facturador' || normalized === 'cajero';
+}
+
 // Verificar si hay sesión activa al cargar la página
 async function checkExistingSession() {
     if (sessionChecked) return;  // Already checked, skip
@@ -1308,7 +1317,7 @@ async function checkExistingSession() {
         try {
             // Verificar que el usuario tenga rol de administrador para esta vista
             const userData = JSON.parse(currentUser);
-            const userRole = (userData.rol || '').toLowerCase();
+            const userRole = normalizeRole(userData.rol);
             
             // Si es analista CON SESIÓN ACTIVA, redirigir a empleados
             if (userRole === 'analista') {
@@ -1318,7 +1327,7 @@ async function checkExistingSession() {
             }
 
             // Si es facturador/cajero CON SESIÓN ACTIVA, redirigir a LabelsApp Web
-            if (userRole === 'facturador' || userRole === 'cajero') {
+            if (isStoreRole(userRole)) {
                 console.log('Usuario de tienda detectado, redirigiendo a /labelsapp-web');
                 window.location.href = '/labelsapp-web';
                 return;
@@ -1359,6 +1368,9 @@ async function checkExistingSession() {
                 
                 // Actualizar avatar
                 updateUserAvatarAdmin(userData);
+            } else {
+                // Si el rol no aplica a dashboard/admin, limpiar sesión para evitar rutas incorrectas.
+                clearSession();
             }
         } catch (e) {
             console.error('Error parsing session data:', e);
@@ -1372,7 +1384,7 @@ async function checkExistingSession() {
 function goToDashboard() {
         // Verificar rol del usuario
         const userData = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        const rol = (userData.rol || '').toLowerCase();
+    const rol = normalizeRole(userData.rol);
         
         // Si es analista, redirigir a /employees en lugar del dashboard
         if (rol === 'analista') {
@@ -1382,7 +1394,7 @@ function goToDashboard() {
         }
 
         // Si es facturador/cajero, ir a LabelsApp Web
-        if (rol === 'facturador' || rol === 'cajero') {
+        if (isStoreRole(rol)) {
             console.log('Usuario de tienda detectado, redirigiendo a /labelsapp-web');
             window.location.href = '/labelsapp-web';
             return;
@@ -1434,7 +1446,7 @@ async function handleLogin(e) {
         updateUserMenu(usuarioData.rol || '');
         
         // Si es ANALISTA, redirigir directo a empleados sin mostrar dashboard
-        const userRole = (usuarioData.rol || '').toLowerCase();
+        const userRole = normalizeRole(usuarioData.rol);
         if (userRole === 'analista') {
             console.log('Usuario analista detectado, redirigiendo a /employees');
             window.location.href = '/employees';
@@ -1442,9 +1454,16 @@ async function handleLogin(e) {
         }
 
         // Si es FACTURADOR/CAJERO, redirigir directo a LabelsApp Web
-        if (userRole === 'facturador' || userRole === 'cajero') {
+        if (isStoreRole(userRole)) {
             console.log('Usuario de tienda detectado, redirigiendo a /labelsapp-web');
             window.location.href = '/labelsapp-web';
+            return;
+        }
+
+        if (userRole !== 'administrador') {
+            clearSession();
+            errorDiv.textContent = 'Acceso restringido para este rol';
+            errorDiv.classList.add('show');
             return;
         }
         
