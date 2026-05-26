@@ -994,85 +994,51 @@
             </div>
 
             <div id="dashboard" class="tab-content active">
-                <!-- Estadísticas en tarjetas -->
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px;">
-                    <div class="dashboard-card" style="text-align: center;">
-                        <h3 style="margin-bottom: 10px;">Sucursales Activas</h3>
-                        <div class="value" id="totalSucursales" style="font-size: 2.5em; color: #1a73e8;">0</div>
-                    </div>
-                    <div class="dashboard-card" style="text-align: center;">
-                        <h3 style="margin-bottom: 10px;">Usuarios Registrados</h3>
-                        <div class="value" id="totalUsuarios" style="font-size: 2.5em; color: #27ae60;">0</div>
-                    </div>
-                    <div class="dashboard-card" style="text-align: center;">
-                        <h3 style="margin-bottom: 10px;">Usuarios Activos</h3>
-                        <div class="value" id="usuariosActivos" style="font-size: 2.5em; color: #f39c12;">0</div>
-                    </div>
-                    <div class="dashboard-card" style="text-align: center;">
-                        <h3 style="margin-bottom: 10px;">Empleados</h3>
-                        <div class="value" id="totalEmpleados" style="font-size: 2.5em; color: #e74c3c;">0</div>
-                    </div>
-                </div>
-
-                <!-- Gráficas -->
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
-                    <!-- Gráfica de Empleados por Sucursal -->
-                    <div class="dashboard-card" style="padding: 20px; min-height: 400px; display: flex; flex-direction: column;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                            <h3 style="margin: 0; flex-shrink: 0;">Empleados por Sucursal</h3>
-                            <select id="zonaEmpleadosSelector" onchange="updateEmpleadosPorSucursalChart()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background: white; font-size: 14px;">
-                                <option value="Santo_Domingo">Santo Domingo</option>
-                                <option value="Zona_Este">Zona Este</option>
-                                <option value="Zona_Norte">Zona Norte</option>
-                                <option value="Zona_Sur">Zona Sur</option>
-                            </select>
+                <div class="dashboard-card" style="padding: 20px; min-height: 300px; display: flex; flex-direction: column; margin-top: 20px;">
+                    <h3 style="margin-bottom: 15px; flex-shrink: 0;">Métricas de Uso LabelsApp</h3>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px;">
+                        <div style="padding: 10px; border: 1px solid #e3ebf5; border-radius: 10px; background: #f8fbff;">
+                            <div style="font-size: 0.82rem; color: #5e7287;">Último Login</div>
+                            <div id="labelsLastLogin" style="font-weight: 700; color: #15395b; margin-top: 4px;">-</div>
                         </div>
-                        <div style="flex-grow: 1; position: relative; min-height: 320px;">
-                            <canvas id="empleadosPorSucursalChart"></canvas>
+                        <div style="padding: 10px; border: 1px solid #e3ebf5; border-radius: 10px; background: #f8fbff;">
+                            <div style="font-size: 0.82rem; color: #5e7287;">Facturas Enviadas</div>
+                            <div id="labelsFacturasTotal" style="font-weight: 700; color: #15395b; margin-top: 4px;">0</div>
+                        </div>
+                        <div style="padding: 10px; border: 1px solid #e3ebf5; border-radius: 10px; background: #f8fbff;">
+                            <div style="font-size: 0.82rem; color: #5e7287;">Items Enviados</div>
+                            <div id="labelsItemsTotal" style="font-weight: 700; color: #15395b; margin-top: 4px;">0</div>
+                        </div>
+                        <div style="padding: 10px; border: 1px solid #e3ebf5; border-radius: 10px; background: #f8fbff;">
+                            <div style="font-size: 0.82rem; color: #5e7287;">Sucursal Más / Menos Uso</div>
+                            <div id="labelsTopSucursal" style="font-weight: 700; color: #15395b; margin-top: 4px;">-</div>
+                            <div id="labelsLowSucursal" style="font-size: 0.84rem; color: #5e7287; margin-top: 2px;">-</div>
                         </div>
                     </div>
 
-                    <!-- Gráfica de Rol de Usuarios -->
-                    <div class="dashboard-card" style="padding: 20px; min-height: 400px; display: flex; flex-direction: column;">
-                        <h3 style="margin-bottom: 15px; flex-shrink: 0;">Distribución por Rol</h3>
-                        <div style="flex-grow: 1; position: relative; min-height: 320px;">
-                            <canvas id="usuariosPorRolChart"></canvas>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                        <div>
+                            <h4 style="margin: 0 0 8px; font-size: 0.9rem; color: #325172;">Productos Más Usados</h4>
+                            <ul id="labelsTopProducts" style="margin: 0; padding-left: 18px; color: #2f4358;"></ul>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0 0 8px; font-size: 0.9rem; color: #325172;">Productos Menos Usados</h4>
+                            <ul id="labelsLowProducts" style="margin: 0; padding-left: 18px; color: #2f4358;"></ul>
                         </div>
                     </div>
-                </div>
 
-                <!-- Gráfico de Sucursales por Zona (Ancho Completo) -->
-                <div class="dashboard-card" style="padding: 20px; min-height: 400px; display: flex; flex-direction: column; margin-top: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h3 style="margin: 0; flex-shrink: 0;">Sucursales por Zona</h3>
-                        <select id="zonaSelector" onchange="updateZonaChart()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background: white; font-size: 14px;">
-                            <option value="Santo_Domingo">Santo Domingo</option>
-                            <option value="Zona_Este">Zona Este</option>
-                            <option value="Zona_Norte">Zona Norte</option>
-                            <option value="Zona_Sur">Zona Sur</option>
-                        </select>
-                    </div>
-                    <div style="flex-grow: 1; position: relative; min-height: 320px;">
-                        <canvas id="estadoUsuariosChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Gráfico de Actividad de Logins (Ancho Completo) -->
-                <div class="dashboard-card" style="padding: 20px; min-height: 400px; display: flex; flex-direction: column; margin-top: 20px;">
-                    <h3 style="margin-bottom: 15px; flex-shrink: 0;">Últimos Logins</h3>
-                    <div style="flex-grow: 1; position: relative; min-height: 320px; overflow-y: auto;">
+                    <div style="margin-top: 16px;">
+                        <h4 style="margin: 0 0 8px; font-size: 0.9rem; color: #325172;">Uso por Sucursal</h4>
                         <table style="width: 100%; border-collapse: collapse;">
                             <thead>
-                                <tr style="background: #f5f5f5; position: sticky; top: 0;">
-                                    <th style="padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: 700;">Usuario</th>
-                                    <th style="padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: 700;">Nombre Completo</th>
-                                    <th style="padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: 700;">Rol</th>
-                                    <th style="padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: 700;">Sucursal</th>
-                                    <th style="padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: 700;">Hora Login</th>
+                                <tr style="background: #f5f5f5;">
+                                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Sucursal</th>
+                                    <th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Facturas</th>
+                                    <th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Items</th>
                                 </tr>
                             </thead>
-                            <tbody id="loginActivityTableBody">
-                                <tr><td colspan="5" style="text-align: center; padding: 20px;">Cargando...</td></tr>
+                            <tbody id="labelsSucursalUsageBody">
+                                <tr><td colspan="3" style="text-align: center; padding: 10px; border: 1px solid #ddd;">Cargando...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1671,81 +1637,92 @@ let loginActivityRefreshInterval = null;  // Intervalo para actualización autom
 
 // Función para actualizar gráficas del dashboard
 function updateDashboardCharts() {
-    // Validar que Chart.js esté disponible
-    if (typeof Chart === 'undefined') {
-        console.warn('Chart.js no disponible, reintentando en 500ms...');
-        setTimeout(updateDashboardCharts, 500);
-        return;
-    }
-    
-    console.log('✓ updateDashboardCharts ejecutándose');
-    console.log('  - allUsuarios:', allUsuarios.length, 'usuarios');
-    console.log('  - allSucursales:', allSucursales.length, 'sucursales');
-    
-    // Contar usuarios activos
-    const countUsuariosActivos = (allUsuarios || []).filter(u => u.activo).length;
-    
-    // 1. Gráfica de Empleados por Sucursal (inicializar con zona por defecto)
-    updateEmpleadosPorSucursalChart();
+    console.log('✓ updateDashboardCharts ejecutándose (LabelsApp métricas)');
+    updateLabelsAppUsageMetrics();
 
-    // 2. Gráfica de Rol de Usuarios
-    const usuariosPorRol = {};
-    (allUsuarios || []).forEach(u => {
-        const rol = u.rol || 'Sin rol';
-        usuariosPorRol[rol] = (usuariosPorRol[rol] || 0) + 1;
-    });
-    
-    console.log('  - Chart 2 data:', usuariosPorRol);
-
-    const ctx2 = document.getElementById('usuariosPorRolChart');
-    if (ctx2) {
-        try {
-            if (usuariosPorRolChart) usuariosPorRolChart.destroy();
-            const colors = ['#1a73e8', '#27ae60', '#f39c12', '#e74c3c', '#9b59b6', '#1abc9c'];
-            usuariosPorRolChart = new Chart(ctx2, {
-                type: 'doughnut',
-                data: {
-                    labels: Object.keys(usuariosPorRol),
-                    datasets: [{
-                        data: Object.values(usuariosPorRol),
-                        backgroundColor: colors.slice(0, Object.keys(usuariosPorRol).length),
-                        borderColor: '#fff',
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom' } }
-                }
-            });
-            console.log('  ✓ Chart 2 (Doughnut) creado');
-        } catch (e) {
-            console.error('Error en Chart 2:', e);
-        }
-    } else {
-        console.error('Canvas #usuariosPorRolChart no encontrado');
-    }
-
-    // 3. [GRÁFICO DE ACTIVIDAD ELIMINADO]
-
-    // 4. Gráfica de Sucursales por Zona
-    updateZonaChart();
-    
-    // 5. Tabla de Actividad de Logins - Actualización automática
-    updateLoginActivityChart();
-    
-    // Iniciar actualización automática cada 3 segundos
+    // Actualización automática cada 5 segundos
     if (loginActivityRefreshInterval) clearInterval(loginActivityRefreshInterval);
     loginActivityRefreshInterval = setInterval(() => {
-        updateLoginActivityChart();
-    }, 3000);  // 3 segundos
+        updateLabelsAppUsageMetrics();
+    }, 5000);
 
-    // Actualizar contadores
-    document.getElementById('usuariosActivos').textContent = countUsuariosActivos;
-    document.getElementById('totalEmpleados').textContent = (allEmpleados || []).length;
-    
     console.log('✓ updateDashboardCharts completado');
+}
+
+function renderLabelsProductList(elementId, rows) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    if (!rows || !rows.length) {
+        el.innerHTML = '<li>Sin datos</li>';
+        return;
+    }
+    el.innerHTML = rows.map(r => `<li>${r.producto} (${Number(r.cantidad || 0)})</li>`).join('');
+}
+
+async function updateLabelsAppUsageMetrics() {
+    try {
+        const res = await fetch(API + '/api/v1/labelsapp/usage-metrics?product_limit=5');
+        if (!res.ok) throw new Error('No se pudo cargar métricas de LabelsApp');
+        const data = await res.json();
+
+        const facturasEl = document.getElementById('labelsFacturasTotal');
+        const itemsEl = document.getElementById('labelsItemsTotal');
+        const lastLoginEl = document.getElementById('labelsLastLogin');
+        const topSucEl = document.getElementById('labelsTopSucursal');
+        const lowSucEl = document.getElementById('labelsLowSucursal');
+
+        if (facturasEl) facturasEl.textContent = Number(data.total_facturas || 0);
+        if (itemsEl) itemsEl.textContent = Number(data.total_items || 0);
+
+        if (lastLoginEl) {
+            if (data.last_login && data.last_login.fecha_hora_login) {
+                const dt = new Date(data.last_login.fecha_hora_login);
+                const fecha = dt.toLocaleDateString('es-DO');
+                const hora = dt.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
+                const username = data.last_login.username || 'N/A';
+                lastLoginEl.textContent = `${username} · ${fecha} ${hora}`;
+            } else {
+                lastLoginEl.textContent = 'Sin registros';
+            }
+        }
+
+        if (topSucEl) {
+            const top = data.sucursal_mas_uso;
+            topSucEl.textContent = top ? `${top.sucursal} (${Number(top.facturas || 0)} fact.)` : 'Sin datos';
+        }
+        if (lowSucEl) {
+            const low = data.sucursal_menos_uso;
+            lowSucEl.textContent = low ? `Menos: ${low.sucursal} (${Number(low.facturas || 0)} fact.)` : 'Menos: Sin datos';
+        }
+
+        renderLabelsProductList('labelsTopProducts', data.top_products || []);
+        renderLabelsProductList('labelsLowProducts', data.low_products || []);
+
+        const usageBody = document.getElementById('labelsSucursalUsageBody');
+        if (usageBody) {
+            const usage = data.sucursal_usage || [];
+            if (!usage.length) {
+                usageBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 10px; border: 1px solid #ddd;">Sin datos</td></tr>';
+            } else {
+                usageBody.innerHTML = usage.slice(0, 10).map(row => (
+                    `<tr>` +
+                    `<td style="padding: 10px; border: 1px solid #ddd;">${row.sucursal || 'N/A'}</td>` +
+                    `<td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${Number(row.facturas || 0)}</td>` +
+                    `<td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${Number(row.items || 0)}</td>` +
+                    `</tr>`
+                )).join('');
+            }
+        }
+    } catch (e) {
+        const lastLoginEl = document.getElementById('labelsLastLogin');
+        if (lastLoginEl) lastLoginEl.textContent = 'Error cargando métricas';
+        renderLabelsProductList('labelsTopProducts', []);
+        renderLabelsProductList('labelsLowProducts', []);
+        const usageBody = document.getElementById('labelsSucursalUsageBody');
+        if (usageBody) {
+            usageBody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: red; padding: 10px; border: 1px solid #ddd;">Error cargando datos</td></tr>';
+        }
+    }
 }
 
 // Función para actualizar gráfica de empleados por sucursal por zona
@@ -2041,12 +2018,14 @@ async function loadSucursales() {
         if (!res.ok) throw new Error('Error fetching sucursales');
         const data = await res.json();
         allSucursales = data.sucursales || [];
-        document.getElementById("totalSucursales").textContent = data.total || 0;
+        const totalSucEl = document.getElementById("totalSucursales");
+        if (totalSucEl) totalSucEl.textContent = data.total || 0;
         Object.keys(zonas).forEach(zona => renderZonaSucursales(zona));
         console.log('Sucursales loaded:', allSucursales.length);
     } catch (e) { 
         console.error('Error loading sucursales:', e);
-        document.getElementById("totalSucursales").textContent = '0';
+        const totalSucEl = document.getElementById("totalSucursales");
+        if (totalSucEl) totalSucEl.textContent = '0';
     }
 }
 
@@ -2994,7 +2973,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                     <button onclick="window.location.href='/'" style="color: #fff; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">🏠 Dashboard</button>
                     <button onclick="goToAnalystView()" style="color: #fff; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">👥 Gestión Empleados</button>
                     <button onclick="goToFormulas()" style="color: #fff; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">🧪 Gestión Fórmulas</button>
-                    <button onclick="goToLabelsAppWeb()" style="color: #fff; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">🏷️ LabelsApp Web</button>
                     ${baseButtons}
                 `;
                 
@@ -3003,7 +2981,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                     navbarTabs.innerHTML = `
                         <button class="tab-btn" onclick="switchTab(event, 'sucursales')">SUCURSALES</button>
                         <button class="tab-btn" onclick="switchTab(event, 'usuarios')">USUARIOS</button>
-                        <button class="tab-btn" onclick="goToLabelsAppWeb()">LABELSAPP</button>
                     `;
                 }
             } else if (userRole === 'analista') {

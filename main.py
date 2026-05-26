@@ -10,6 +10,7 @@ import time
 import os
 import re
 import unicodedata
+from collections import defaultdict
 from typing import Optional, List
 from pydantic import BaseModel
 
@@ -2437,6 +2438,132 @@ async def get_login_activity(limit: int = 50, db=Depends(get_db)):
     except Exception as e:
         logger.error(f"Error getting login activity: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/labelsapp/usage-metrics")
+async def labelsapp_usage_metrics(product_limit: int = 5, db=Depends(get_db)):
+    """Resumen de uso de LabelsApp para dashboard administrativo."""
+    try:
+        safe_limit = max(3, min(int(product_limit or 5), 20))
+        cur = db.cursor()
+
+        cur.execute(
+            """
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema='public'
+              AND table_name LIKE 'pedidos_pendientes_%'
+            ORDER BY table_name
+            """
+        )
+        tables = [r[0] for r in cur.fetchall() if r and r[0]]
+
+        product_totals = defaultdict(int)
+        sucursal_totals = {}
+        total_facturas = 0
+        total_items = 0
+
+        for table_name in tables:
+            if not re.match(r"^pedidos_pendientes_[a-z0-9_]+$", table_name):
+                continue
+
+            sucursal_slug = table_name.replace("pedidos_pendientes_", "").strip() or "principal"
+
+            cur.execute(
+                f"""
+                SELECT COUNT(DISTINCT id_factura) AS facturas,
+                       COALESCE(SUM(COALESCE(cantidad, 1)), 0) AS items
+                FROM {table_name}
+                WHERE TRIM(COALESCE(id_factura, '')) <> ''
+                """
+            )
+            facts_row = cur.fetchone() or (0, 0)
+            facturas_count = int(facts_row[0] or 0)
+            items_count = int(facts_row[1] or 0)
+
+            sucursal_totals[sucursal_slug] = {
+                "sucursal_slug": sucursal_slug,
+                "facturas": facturas_count,
+                "items": items_count,
+            }
+            total_facturas += facturas_count
+            total_items += items_count
+
+            cur.execute(
+                f"""
+                SELECT TRIM(COALESCE(producto, '')) AS producto,
+                       COALESCE(SUM(COALESCE(cantidad, 1)), 0) AS qty
+                FROM {table_name}
+                WHERE TRIM(COALESCE(producto, '')) <> ''
+                GROUP BY TRIM(COALESCE(producto, ''))
+                """
+            )
+            for producto, qty in cur.fetchall() or []:
+                product_name = (producto or "").strip()
+                if not product_name:
+                    continue
+                product_totals[product_name] += int(qty or 0)
+
+        # Mapa de sucursal_slug -> nombre real
+        cur.execute("SELECT nombre FROM sucursales")
+        slug_to_name = {}
+        for row in cur.fetchall() or []:
+            suc_name = (row[0] or "").strip()
+            if not suc_name:
+                continue
+            slug_to_name[_normalize_sucursal_slug(suc_name)] = suc_name
+
+        sucursal_usage = []
+        for slug, data in sucursal_totals.items():
+            sucursal_usage.append({
+                "sucursal": slug_to_name.get(slug, slug.replace("_", " ").title()),
+                "sucursal_slug": slug,
+                "facturas": data["facturas"],
+                "items": data["items"],
+            })
+        sucursal_usage.sort(key=lambda x: (-x["facturas"], -x["items"], x["sucursal"]))
+
+        product_usage = [
+            {"producto": k, "cantidad": int(v)}
+            for k, v in product_totals.items()
+            if int(v or 0) > 0
+        ]
+        product_usage.sort(key=lambda x: (-x["cantidad"], x["producto"].lower()))
+        top_products = product_usage[:safe_limit]
+        low_products = sorted(product_usage, key=lambda x: (x["cantidad"], x["producto"].lower()))[:safe_limit]
+
+        cur.execute(
+            """
+            SELECT username, nombre_completo, rol, sucursal, fecha_hora_login
+            FROM login_audits
+            ORDER BY fecha_hora_login DESC
+            LIMIT 1
+            """
+        )
+        last_login_row = cur.fetchone()
+        last_login = None
+        if last_login_row:
+            last_login = {
+                "username": last_login_row[0],
+                "nombre_completo": last_login_row[1],
+                "rol": last_login_row[2],
+                "sucursal": last_login_row[3],
+                "fecha_hora_login": last_login_row[4].isoformat() if last_login_row[4] else None,
+            }
+
+        return {
+            "total_facturas": total_facturas,
+            "total_items": total_items,
+            "last_login": last_login,
+            "top_products": top_products,
+            "low_products": low_products,
+            "sucursal_usage": sucursal_usage,
+            "sucursal_mas_uso": sucursal_usage[0] if sucursal_usage else None,
+            "sucursal_menos_uso": sucursal_usage[-1] if sucursal_usage else None,
+        }
+    except Exception as e:
+        logger.error(f"Error getting labelsapp usage metrics: {e}")
+        raise HTTPException(status_code=500, detail="Error obteniendo métricas de LabelsApp")
 
 
 # ============================================================
