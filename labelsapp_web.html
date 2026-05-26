@@ -1004,9 +1004,6 @@
                 terminaciones: ["Mate", "Satin", "Gloss"],
                 presentaciones: ["Cuarto", "Galon"]
             },
-            "exc. texturizado": {
-                presentaciones: ["Cubeta"]
-            },
             "texturizado": {
                 presentaciones: ["Cubeta"]
             },
@@ -1151,10 +1148,24 @@
             "Macropoxy 4600",
             "Industrial Enamel",
             "SUPERPAINT A&P",
-            "EXC. TEXTURIZADO",
             "Urethane Alkyd",
             "Water-Base Catalyzed"
         ];
+
+        const PRODUCT_NAME_ALIASES = {
+            "exc. texturizado": "texturizado",
+            "exc texturizado": "texturizado",
+            "exc. texdturizado": "texturizado",
+            "exc texdturizado": "texturizado"
+        };
+
+        const PRODUCT_DISPLAY_BY_CANON = {
+            "texturizado": "Texturizado"
+        };
+
+        const PRODUCT_FORCED_CODE_BY_CANON = {
+            "texturizado": "A44WGBX01-"
+        };
 
         const productIndex = [];
         const PRODUCT_USAGE_STORAGE_KEY = "labelsapp_product_usage_v1";
@@ -1205,7 +1216,22 @@
         }
 
         function normalizeProductKey(name) {
-            return normalize(name).replace(/\s+/g, " ");
+            return canonicalProductName(name);
+        }
+
+        function canonicalProductName(name) {
+            const normalized = normalize(name).replace(/\s+/g, " ");
+            return PRODUCT_NAME_ALIASES[normalized] || normalized;
+        }
+
+        function displayProductName(name) {
+            const canon = canonicalProductName(name);
+            return PRODUCT_DISPLAY_BY_CANON[canon] || (name || "").toString().trim();
+        }
+
+        function forcedCodeForProductName(name) {
+            const canon = canonicalProductName(name);
+            return PRODUCT_FORCED_CODE_BY_CANON[canon] || "";
         }
 
         function getProductUsageScore(name) {
@@ -1525,9 +1551,20 @@
             const normalized = options
                 .map(name => (name || "").toString().trim())
                 .filter(Boolean)
-                .map(name => ({ name, norm: normalize(name) }));
+                .map(name => {
+                    const display = displayProductName(name);
+                    return { name: display, norm: normalize(display), canon: canonicalProductName(display) };
+                });
 
-            for (const p of sortProductsByUsage(normalized)) {
+            const seenCanon = new Set();
+            const deduped = [];
+            for (const item of normalized) {
+                if (seenCanon.has(item.canon)) continue;
+                seenCanon.add(item.canon);
+                deduped.push(item);
+            }
+
+            for (const p of sortProductsByUsage(deduped)) {
                 productIndex.push({
                     name: p.name,
                     norm: p.norm,
@@ -1555,7 +1592,18 @@
         }
 
         function applyProductRules() {
-            const product = normalize(document.getElementById("producto").value);
+            const productInput = document.getElementById("producto");
+            const displayProduct = displayProductName(productInput.value);
+            if (displayProduct) {
+                productInput.value = displayProduct;
+            }
+
+            const forcedCode = forcedCodeForProductName(displayProduct);
+            if (forcedCode) {
+                document.getElementById("codigo").value = forcedCode;
+            }
+
+            const product = normalize(displayProduct);
             const base = normalize(document.getElementById("base").value);
 
             const term = getValidTerminaciones(product, base);
@@ -1601,18 +1649,59 @@
                 productByCode.clear();
                 codeIndex.length = 0;
                 const productNames = new Set(PRODUCT_OPTIONS);
+                const dedupeCodeAndName = new Set();
 
                 for (const p of (data.productos || [])) {
-                    const code = (p.codigo || "").toString();
+                    const originalName = (p.nombre || "").toString();
+                    const canonicalName = canonicalProductName(originalName);
+                    const displayName = PRODUCT_DISPLAY_BY_CANON[canonicalName] || originalName;
+
+                    let code = (p.codigo || "").toString().trim();
+                    if (canonicalName === "texturizado") {
+                        code = PRODUCT_FORCED_CODE_BY_CANON.texturizado;
+                    }
+
                     if (!code) continue;
-                    productByCode.set(code, p);
+
+                    const normalizedProduct = {
+                        ...p,
+                        codigo: code,
+                        nombre: displayName
+                    };
+
+                    productByCode.set(code, normalizedProduct);
+
+                    const dedupeKey = `${normalize(code)}|${normalize(displayName)}`;
+                    if (dedupeCodeAndName.has(dedupeKey)) continue;
+                    dedupeCodeAndName.add(dedupeKey);
+
                     codeIndex.push({
                         code,
                         codeNorm: normalize(code),
-                        name: (p.nombre || "").toString(),
-                        nameNorm: normalize(p.nombre || ""),
+                        name: displayName,
+                        nameNorm: normalize(displayName),
                     });
 
+                    productNames.add(displayName);
+
+                }
+
+                if (!productByCode.has(PRODUCT_FORCED_CODE_BY_CANON.texturizado)) {
+                    const forcedCode = PRODUCT_FORCED_CODE_BY_CANON.texturizado;
+                    const forcedName = PRODUCT_DISPLAY_BY_CANON.texturizado;
+                    productByCode.set(forcedCode, {
+                        codigo: forcedCode,
+                        nombre: forcedName,
+                        base: "",
+                        ubicacion: ""
+                    });
+                    codeIndex.push({
+                        code: forcedCode,
+                        codeNorm: normalize(forcedCode),
+                        name: forcedName,
+                        nameNorm: normalize(forcedName),
+                    });
+                    productNames.add(forcedName);
                 }
 
                 setProductOptions(Array.from(productNames).filter(Boolean).sort((a, b) => a.localeCompare(b, "es")));
