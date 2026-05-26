@@ -1768,6 +1768,26 @@ function normalizeSucursalSlug(text) {
         .replace(/^_+|_+$/g, '') || 'principal';
 }
 
+function getSucursalesSubtabZoneKeys() {
+    return Object.keys(zonas || {});
+}
+
+function toSubtabZoneKey(zoneValue) {
+    const normalized = normalizeTextBasic(zoneValue).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if (!normalized) return 'Sin_Zona';
+
+    const zoneKeys = getSucursalesSubtabZoneKeys();
+    const directMatch = zoneKeys.find(key => normalizeTextBasic(key).replace(/[^a-z0-9]+/g, '_') === normalized);
+    if (directMatch) return directMatch;
+
+    if (normalized === 'santo_domingo' || normalized === 'santo_dom' || normalized === 'sto_domingo') return 'Santo_Domingo';
+    if (normalized === 'zona_este' || normalized === 'este') return 'Zona_Este';
+    if (normalized === 'zona_norte' || normalized === 'norte') return 'Zona_Norte';
+    if (normalized === 'zona_sur' || normalized === 'sur') return 'Zona_Sur';
+
+    return 'Sin_Zona';
+}
+
 function zoneKeyToLabel(zoneKey) {
     return (zoneKey || 'Sin_Zona').replace(/_/g, ' ');
 }
@@ -1795,18 +1815,35 @@ function renderLabelsProductList(elementId, rows) {
 
 function getZonaUsageRows(data) {
     if (Array.isArray(data.zona_usage) && data.zona_usage.length) {
-        return data.zona_usage;
+        const mapped = {};
+        data.zona_usage.forEach(row => {
+            const zona = toSubtabZoneKey(row.zona);
+            if (!mapped[zona]) mapped[zona] = { zona, facturas: 0, items: 0, sucursales: 0 };
+            mapped[zona].facturas += Number(row.facturas || 0);
+            mapped[zona].items += Number(row.items || 0);
+            mapped[zona].sucursales += Number(row.sucursales || 0);
+        });
+
+        getSucursalesSubtabZoneKeys().forEach(zoneKey => {
+            if (!mapped[zoneKey]) mapped[zoneKey] = { zona: zoneKey, facturas: 0, items: 0, sucursales: 0 };
+        });
+
+        return Object.values(mapped).sort((a, b) => (b.facturas - a.facturas) || (b.items - a.items));
     }
 
     const byZona = {};
     (data.sucursal_usage || []).forEach(row => {
-        const zona = row.zona || getZonaFromSucursalName(row.sucursal);
+        const zona = toSubtabZoneKey(row.zona || getZonaFromSucursalName(row.sucursal));
         if (!byZona[zona]) {
             byZona[zona] = { zona, facturas: 0, items: 0, sucursales: 0 };
         }
         byZona[zona].facturas += Number(row.facturas || 0);
         byZona[zona].items += Number(row.items || 0);
         byZona[zona].sucursales += 1;
+    });
+
+    getSucursalesSubtabZoneKeys().forEach(zoneKey => {
+        if (!byZona[zoneKey]) byZona[zoneKey] = { zona: zoneKey, facturas: 0, items: 0, sucursales: 0 };
     });
 
     return Object.values(byZona).sort((a, b) => (b.facturas - a.facturas) || (b.items - a.items));
@@ -1817,20 +1854,29 @@ function updateLabelsZoneSelector(data) {
     if (!selector) return;
     const current = selector.value || 'ALL';
     const zonasRows = getZonaUsageRows(data);
+    const zoneKeys = getSucursalesSubtabZoneKeys();
+    const zonasByKey = {};
+    zonasRows.forEach(z => { zonasByKey[z.zona] = z; });
     const opts = ['<option value="ALL">Todas las Zonas</option>'];
+    zoneKeys.forEach(zoneKey => {
+        opts.push(`<option value="${zoneKey}">${zoneKeyToLabel(zoneKey)}</option>`);
+    });
+
     zonasRows.forEach(z => {
-        opts.push(`<option value="${z.zona}">${zoneKeyToLabel(z.zona)}</option>`);
+        if (!zoneKeys.includes(z.zona) && z.zona !== 'Sin_Zona') {
+            opts.push(`<option value="${z.zona}">${zoneKeyToLabel(z.zona)}</option>`);
+        }
     });
     selector.innerHTML = opts.join('');
 
-    const exists = zonasRows.some(z => z.zona === current);
+    const exists = !!zonasByKey[current] || zoneKeys.includes(current);
     selector.value = exists || current === 'ALL' ? current : 'ALL';
 }
 
 function getFilteredSucursalUsage(data, selectedZona) {
     const rows = (data.sucursal_usage || []).map(row => ({
         ...row,
-        zona: row.zona || getZonaFromSucursalName(row.sucursal)
+        zona: toSubtabZoneKey(row.zona || getZonaFromSucursalName(row.sucursal))
     }));
     if (!selectedZona || selectedZona === 'ALL') return rows;
     return rows.filter(r => r.zona === selectedZona);
@@ -1949,7 +1995,7 @@ async function buildFallbackLabelsMetrics() {
 
     const requests = sucursales.map(async suc => {
         const sucursalNombre = suc.nombre || 'N/A';
-        const zona = suc.zona || getZonaFromSucursalName(sucursalNombre);
+        const zona = toSubtabZoneKey(suc.zona || getZonaFromSucursalName(sucursalNombre));
         const slug = normalizeSucursalSlug(sucursalNombre);
         try {
             const qRes = await fetch(API + `/api/v1/labelsapp/live-queue?sucursal=${encodeURIComponent(slug)}&limit=250`);
