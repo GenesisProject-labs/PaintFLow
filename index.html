@@ -1738,6 +1738,8 @@ let loginActivityRefreshInterval = null;  // Intervalo para actualización autom
 let labelsZonaUsageChart = null;
 let labelsTopSucursalesChart = null;
 let labelsMetricsCache = null;
+let labelsMetricsLoading = false;
+let labelsLastRenderSignature = '';
 
 // Función para actualizar gráficas del dashboard
 function updateDashboardCharts() {
@@ -1748,7 +1750,7 @@ function updateDashboardCharts() {
     if (loginActivityRefreshInterval) clearInterval(loginActivityRefreshInterval);
     loginActivityRefreshInterval = setInterval(() => {
         updateLabelsAppUsageMetrics();
-    }, 10000);
+    }, 30000);
 
     console.log('✓ updateDashboardCharts completado');
 }
@@ -1912,20 +1914,44 @@ function renderLabelsCharts(data, selectedZona) {
             type: 'bar',
             data: {
                 labels: zonaRows.map(z => zoneKeyToLabel(z.zona)),
-                datasets: [{
-                    label: 'Facturas por Zona',
-                    data: zonaRows.map(z => Number(z.facturas || 0)),
-                    backgroundColor: ['#0b6cf0', '#17a398', '#ff8c42', '#7a5af8', '#ec4899', '#22c55e']
-                }]
+                datasets: [
+                    {
+                        label: 'Facturas',
+                        data: zonaRows.map(z => Number(z.facturas || 0)),
+                        backgroundColor: ['#0b6cf0', '#17a398', '#ff8c42', '#7a5af8', '#ec4899', '#22c55e'],
+                        borderRadius: 8,
+                        maxBarThickness: 38
+                    },
+                    {
+                        label: 'Items',
+                        type: 'line',
+                        data: zonaRows.map(z => Number(z.items || 0)),
+                        borderColor: '#1f3d5b',
+                        backgroundColor: 'rgba(31, 61, 91, 0.15)',
+                        borderWidth: 3,
+                        pointRadius: 4,
+                        pointHoverRadius: 5,
+                        tension: 0.3,
+                        yAxisID: 'y1'
+                    }
+                ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { display: false },
+                    legend: { display: true, position: 'bottom' },
                     title: { display: true, text: 'Vista General por Zonas' }
                 },
-                scales: { y: { beginAtZero: true } }
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: 'Facturas' } },
+                    y1: {
+                        beginAtZero: true,
+                        position: 'right',
+                        grid: { drawOnChartArea: false },
+                        title: { display: true, text: 'Items' }
+                    }
+                }
             }
         });
     }
@@ -1937,18 +1963,27 @@ function renderLabelsCharts(data, selectedZona) {
     if (topCanvas) {
         if (labelsTopSucursalesChart) labelsTopSucursalesChart.destroy();
         labelsTopSucursalesChart = new Chart(topCanvas, {
-            type: 'doughnut',
+            type: 'bar',
             data: {
                 labels: sucRows.map(r => r.sucursal || 'N/A'),
                 datasets: [{
                     label: 'Facturas',
                     data: sucRows.map(r => Number(r.facturas || 0)),
-                    backgroundColor: ['#1a73e8', '#00a896', '#ff9f1c', '#ef476f', '#8338ec', '#3a86ff', '#fb5607', '#43aa8b']
+                    backgroundColor: ['#1a73e8', '#00a896', '#ff9f1c', '#ef476f', '#8338ec', '#3a86ff', '#fb5607', '#43aa8b'],
+                    borderRadius: 8,
+                    maxBarThickness: 26
+                }, {
+                    label: 'Items',
+                    data: sucRows.map(r => Number(r.items || 0)),
+                    backgroundColor: 'rgba(31, 61, 91, 0.30)',
+                    borderRadius: 8,
+                    maxBarThickness: 26
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                indexAxis: 'y',
                 plugins: {
                     legend: { position: 'bottom' },
                     title: {
@@ -1957,6 +1992,10 @@ function renderLabelsCharts(data, selectedZona) {
                             ? 'Top Sucursales (Todas las Zonas)'
                             : `Top Sucursales (${zoneKeyToLabel(selectedZona)})`
                     }
+                }
+                ,
+                scales: {
+                    x: { beginAtZero: true }
                 }
             }
         });
@@ -1983,22 +2022,81 @@ function updateLabelsZoneView() {
     if (topZonaEl) topZonaEl.textContent = selectedZona === 'ALL' ? 'General' : zoneKeyToLabel(selectedZona);
     if (countsEl) countsEl.textContent = `${zonasActivas} zonas / ${filteredRows.length} sucursales`;
 
+    const signature = [
+        selectedZona,
+        filteredRows.length,
+        facturasTotal,
+        itemsTotal,
+        ...filteredRows.slice(0, 5).map(r => `${r.sucursal}:${r.facturas}:${r.items}`)
+    ].join('|');
+    const shouldRedrawCharts = labelsLastRenderSignature !== signature;
+    labelsLastRenderSignature = signature;
+
     renderLabelsUsageTable(filteredRows);
-    renderLabelsCharts(labelsMetricsCache, selectedZona);
+    if (shouldRedrawCharts) {
+        renderLabelsCharts(labelsMetricsCache, selectedZona);
+    }
+}
+
+function getCachedLabelsMetrics() {
+    try {
+        const raw = localStorage.getItem('labels_metrics_cache_v1');
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !parsed.data || !parsed.ts) return null;
+        const ageMs = Date.now() - Number(parsed.ts || 0);
+        if (ageMs > 120000) return null;
+        return parsed.data;
+    } catch (_) {
+        return null;
+    }
+}
+
+function setCachedLabelsMetrics(data) {
+    try {
+        localStorage.setItem('labels_metrics_cache_v1', JSON.stringify({ ts: Date.now(), data }));
+    } catch (_) {}
+}
+
+async function fetchWithTimeout(url, timeoutMs = 6000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        return await fetch(url, { signal: controller.signal });
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+async function mapWithConcurrency(items, limit, mapper) {
+    const results = new Array(items.length);
+    let current = 0;
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (true) {
+            const idx = current;
+            current += 1;
+            if (idx >= items.length) break;
+            results[idx] = await mapper(items[idx], idx);
+        }
+    });
+    await Promise.all(workers);
+    return results;
 }
 
 async function buildFallbackLabelsMetrics() {
-    const sucRes = await fetch(API + '/api/v1/sucursales');
+    const sucRes = await fetchWithTimeout(API + '/api/v1/sucursales', 5000);
     if (!sucRes.ok) throw new Error('No se pudo consultar sucursales para fallback');
     const sucData = await sucRes.json();
     const sucursales = Array.isArray(sucData.sucursales) ? sucData.sucursales : [];
 
-    const requests = sucursales.map(async suc => {
+    const filteredSucursales = sucursales.filter(s => (s && (s.nombre || '').trim()));
+
+    const requests = await mapWithConcurrency(filteredSucursales, 4, async suc => {
         const sucursalNombre = suc.nombre || 'N/A';
         const zona = toSubtabZoneKey(suc.zona || getZonaFromSucursalName(sucursalNombre));
         const slug = normalizeSucursalSlug(sucursalNombre);
         try {
-            const qRes = await fetch(API + `/api/v1/labelsapp/live-queue?sucursal=${encodeURIComponent(slug)}&limit=250`);
+            const qRes = await fetchWithTimeout(API + `/api/v1/labelsapp/live-queue?sucursal=${encodeURIComponent(slug)}&limit=250`, 4500);
             if (!qRes.ok) return { sucursal: sucursalNombre, zona, facturas: 0, items: 0 };
             const queue = await qRes.json();
             const items = Array.isArray(queue.items) ? queue.items : [];
@@ -2010,7 +2108,7 @@ async function buildFallbackLabelsMetrics() {
         }
     });
 
-    const sucursal_usage = (await Promise.all(requests)).filter(r => Number(r.facturas || 0) > 0 || Number(r.items || 0) > 0);
+    const sucursal_usage = requests.filter(r => Number(r.facturas || 0) > 0 || Number(r.items || 0) > 0);
     sucursal_usage.sort((a, b) => (Number(b.facturas || 0) - Number(a.facturas || 0)) || (Number(b.items || 0) - Number(a.items || 0)));
 
     const zonaMap = {};
@@ -2042,9 +2140,22 @@ async function buildFallbackLabelsMetrics() {
 }
 
 async function updateLabelsAppUsageMetrics() {
+    if (labelsMetricsLoading) return;
+    labelsMetricsLoading = true;
+
     const statusEl = document.getElementById('labelsMetricStatus');
     try {
-        const res = await fetch(API + '/api/v1/labelsapp/usage-metrics?product_limit=5');
+        const cached = getCachedLabelsMetrics();
+        if (cached) {
+            labelsMetricsCache = cached;
+            updateLabelsZoneSelector(cached);
+            updateLabelsZoneView();
+            if (statusEl) statusEl.textContent = 'Mostrando cache, actualizando datos...';
+        } else if (statusEl) {
+            statusEl.textContent = 'Cargando métricas...';
+        }
+
+        const res = await fetchWithTimeout(API + '/api/v1/labelsapp/usage-metrics?product_limit=5', 5000);
         if (!res.ok) {
             let detail = '';
             try {
@@ -2055,6 +2166,7 @@ async function updateLabelsAppUsageMetrics() {
         }
         const data = await res.json();
         labelsMetricsCache = data;
+        setCachedLabelsMetrics(data);
 
         const lastLoginEl = document.getElementById('labelsLastLogin');
 
@@ -2081,6 +2193,7 @@ async function updateLabelsAppUsageMetrics() {
         try {
             const fallbackData = await buildFallbackLabelsMetrics();
             labelsMetricsCache = fallbackData;
+            setCachedLabelsMetrics(fallbackData);
             const lastLoginEl = document.getElementById('labelsLastLogin');
             if (lastLoginEl) lastLoginEl.textContent = 'No disponible (modo live)';
             renderLabelsProductList('labelsTopProducts', [{ producto: 'No disponible en modo live', cantidad: 0 }]);
@@ -2098,6 +2211,8 @@ async function updateLabelsAppUsageMetrics() {
             renderLabelsUsageTable([]);
             if (statusEl) statusEl.textContent = `Error: ${fallbackError.message || e.message || 'No se pudo cargar la vista general'}`;
         }
+    } finally {
+        labelsMetricsLoading = false;
     }
 }
 
