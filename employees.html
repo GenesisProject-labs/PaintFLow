@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EMPLEADOS - PaintFlow</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: Roboto, sans-serif;
@@ -1009,6 +1009,209 @@
             }
         }
 
+        :root {
+            --pf-ink: #13263d;
+            --pf-muted: #516277;
+            --pf-bg-1: #f8fbff;
+            --pf-bg-2: #eef4fb;
+            --pf-card: #ffffff;
+            --pf-line: #dfe6ef;
+            --pf-brand: #1a73e8;
+            --pf-brand-strong: #0f4ea8;
+            --pf-shadow: 0 14px 36px rgba(15, 40, 74, 0.12);
+        }
+
+        body {
+            font-family: Manrope, sans-serif;
+            color: var(--pf-ink);
+            background:
+                radial-gradient(1100px 560px at 8% -10%, #e3efff 0%, transparent 58%),
+                radial-gradient(820px 460px at 100% 0%, #e9f8f2 0%, transparent 46%),
+                linear-gradient(165deg, var(--pf-bg-1) 0%, var(--pf-bg-2) 100%);
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.9);
+            color: var(--pf-ink);
+            border-bottom: 1px solid var(--pf-line);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 10px 28px rgba(17, 48, 85, 0.08);
+            padding: 14px 24px;
+        }
+
+        .header-content {
+            width: 100%;
+            max-width: none;
+            margin: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .title,
+        .section-header h2,
+        h1,
+        h2,
+        h3 {
+            font-family: Space Grotesk, sans-serif;
+            letter-spacing: 0.01em;
+        }
+
+        .main-content,
+        .content-card,
+        .controls,
+        .search-section,
+        .no-results,
+        .modal-content,
+        .chart-card,
+        .kpi-card {
+            background: var(--pf-card);
+            border: 1px solid var(--pf-line);
+            box-shadow: var(--pf-shadow);
+            border-radius: 16px;
+        }
+
+        .subtabs-container,
+        .filters,
+        .header-buttons {
+            background: #ffffff;
+            border: 1px solid var(--pf-line);
+            border-radius: 14px;
+            box-shadow: 0 8px 22px rgba(15, 40, 74, 0.07);
+            padding: 10px;
+        }
+
+        .btn,
+        .btn-primary,
+        .btn-secondary,
+        .btn-formulas,
+        .user-dropdown-btn,
+        .subtab-btn {
+            border-radius: 12px;
+            transition: transform 0.2s ease, box-shadow 0.25s ease, opacity 0.2s ease;
+        }
+
+        .btn:hover,
+        .btn-primary:hover,
+        .btn-secondary:hover,
+        .btn-formulas:hover,
+        .user-dropdown-btn:hover,
+        .subtab-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(15, 52, 95, 0.16);
+        }
+
+        table {
+            border: 1px solid var(--pf-line);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 8px 18px rgba(15, 40, 74, 0.08);
+        }
+
+        th {
+            background: #f6f9fe;
+            color: #2a4768;
+            border-bottom: 1px solid var(--pf-line);
+        }
+
+        td {
+            border-bottom: 1px solid #edf2f8;
+        }
+
+        input,
+        select,
+        textarea,
+        .search-input,
+        .form-control {
+            border: 1px solid var(--pf-line) !important;
+            border-radius: 10px;
+            background: #fff;
+            color: var(--pf-ink);
+        }
+
+        .dropdown-menu {
+            background: #fff;
+            border: 1px solid var(--pf-line);
+            box-shadow: 0 14px 30px rgba(15, 40, 74, 0.14);
+            border-radius: 12px;
+        }
+
+        @keyframes pfFadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(14px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .main-content,
+        .content-card,
+        .subtab-content,
+        .chart-card,
+        .kpi-card,
+        .no-results {
+            animation: pfFadeUp 0.35s ease both;
+        }
+
+        body,
+        .header,
+        .header *,
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6,
+        p,
+        span,
+        label,
+        th,
+        td,
+        a,
+        .main-content,
+        .container,
+        .content-card,
+        .controls,
+        .search-section,
+        .search-group,
+        .section-header,
+        .section-header h2,
+        .subtab-btn,
+        .btn,
+        .btn-primary,
+        .btn-secondary,
+        .btn-success,
+        .btn-formulas,
+        .modal-content,
+        .modal-content * {
+            color: #111 !important;
+        }
+
+        .subtab-btn {
+            background: transparent !important;
+            border: 1px solid transparent !important;
+            border-bottom: 2px solid transparent !important;
+            border-radius: 8px !important;
+            box-shadow: none !important;
+            text-transform: none !important;
+            letter-spacing: 0 !important;
+            font-weight: 600;
+        }
+
+        .subtab-btn.active {
+            background: #fff !important;
+            border-color: #dfe6ef !important;
+            border-bottom-color: #111 !important;
+            color: #111 !important;
+        }
+
+        .dropdown-menu button {
+            color: #111 !important;
+        }
+
     </style>
 </head>
 <body>
@@ -1021,7 +1224,7 @@
             <div class="user-menu">
                 <div class="user-menu-container">
                     <button class="user-dropdown-btn" id="userDropdownBtn" onclick="toggleUserDropdown()">
-                        <div class="user-avatar" id="userAvatar">👤</div>
+                        <div class="user-avatar" id="userAvatar">U</div>
                         <span id="adminUserName">Usuario</span>
                     </button>
                     <div class="dropdown-menu" id="userDropdown">
@@ -1038,10 +1241,10 @@
                 <div class="search-section">
                     <div class="search-group">
                         <input type="text" class="search-input" placeholder="Nombre o código del empleado..." id="searchInput" oninput="filterEmployees()">
-                        <button class="btn btn-secondary" onclick="clearSearch()">✕ Limpiar</button>
+                        <button class="btn btn-secondary" onclick="clearSearch()">Limpiar</button>
                     </div>
-                    <button class="btn btn-primary" onclick="abrirDashboardAnalista()">📊 Dashboard Analista</button>
-                    <button class="btn btn-success" onclick="abrirModalEmpleado()">👥 Agregar Empleado</button>
+                    <button class="btn btn-primary" onclick="abrirDashboardAnalista()">Dashboard Analista</button>
+                    <button class="btn btn-success" onclick="abrirModalEmpleado()">Agregar Empleado</button>
                 </div>
                 <div class="subtabs-container" id="subtabsContainer"></div>
             </div>
@@ -1196,10 +1399,10 @@
         let analystLastFetchMs = 0;
 
         const ANALYST_ZONAS = {
-            Santo_Domingo: ['Bella Vista', 'Churchill', 'Tiradentes', 'San Martin', 'Luperon', 'Arroyo Hondo', 'San Isidro', 'Alameda', 'Zona Oriental', 'Villa Mella'],
-            Zona_Este: ['Romana', 'Punta Cana', 'Bavaro'],
-            Zona_Norte: ['La Vega', 'Puerto Plata', 'San Francisco', 'Terrenas', 'Rafael Vidal', 'Santiago Bartolome Colon'],
-            Zona_Sur: ['Bani']
+            Santo_Domingo: ['Tiradentes', 'Luperon', 'Churchill', 'Bella Vista', 'Zona Oriental', 'Arroyo Hondo', 'San Isidro', 'Villa Mella', 'Alameda', 'San Martin'],
+            Zona_Norte: ['Rafael Vidal', 'Rafel Vidal', 'Bartolome Colon', 'Santiago Bartolome Colon', 'Puerto Plata', 'Samana', 'San Francisco', 'La Vega'],
+            Zona_Sur: ['Bani'],
+            Zona_Este: ['Punta Cana', 'Romana', 'Bavaro']
         };
         const ANALYST_ZONE_KEYS = Object.keys(ANALYST_ZONAS);
         const ANALYST_SUCURSAL_TO_ZONE = (() => {
@@ -1209,14 +1412,27 @@
                     map.set(normalizeTextBasic(name), zoneKey);
                 });
             });
-            // Alias comun con acento.
+            // Alias comunes / variantes de escritura.
+            map.set(normalizeTextBasic('Samaná'), 'Zona_Norte');
+            map.set(normalizeTextBasic('Samana'), 'Zona_Norte');
             map.set(normalizeTextBasic('Bani'), 'Zona_Sur');
-            map.set(normalizeTextBasic('Baní'), 'Zona_Sur');
             return map;
         })();
 
-        function isValidAnalystSucursal(name) {
-            return ANALYST_SUCURSAL_TO_ZONE.has(normalizeTextBasic(name));
+        function resolveAnalystZona(name, zonaHint = '') {
+            const target = normalizeTextBasic(name);
+            if (!target) return 'Sin_Zona';
+            if (ANALYST_SUCURSAL_TO_ZONE.has(target)) {
+                return ANALYST_SUCURSAL_TO_ZONE.get(target);
+            }
+            return 'Sin_Zona';
+        }
+
+        function isValidAnalystSucursal(name, zonaHint = '') {
+            const raw = String(name || '');
+            const normalized = normalizeTextBasic(raw);
+            if ((normalized === 'bani' || normalized === 'bavaro') && /[íá]/i.test(raw)) return false;
+            return resolveAnalystZona(name, zonaHint) !== 'Sin_Zona';
         }
         
         function fmt(posicion) {
@@ -1263,27 +1479,17 @@
         }
         
         function extraerSucursalesUnicas() {
-            // LISTA BLANCA: Solo tiendas reales
-            const tiendas_validas = [
-                'Alameda', 'Arroyo Hondo', 'Bani', 'Bavaro', 'Bella Vista', 'Churchill', 'La Vega', 'Luperon',
-                'Puerto Plata', 'Punta Cana', 'Rafael Vidal', 'Romana', 'San Francisco',
-                'San Isidro', 'San Martin', 'Santiago Bartolome Colon', 'Terrenas', 'Tiradentes',
-                'Villa Mella', 'Zona Oriental'
-            ];
-            
-            // Si tenemos sucursales del API, usarlas todas
+            // Solo tiendas operativas; todo lo demás queda fuera.
             if (allSucursales && allSucursales.length > 0) {
-                // Extraer nombres de las sucursales del API (solo tiendas válidas)
                 sucursalesUnicas = allSucursales
+                    .filter(s => isValidAnalystSucursal(s.nombre || s.sucursal_nombre || s.name, s.zona || s.zona_nombre || s.region))
                     .map(s => s.nombre || s.sucursal_nombre || s.name)
                     .filter(Boolean)
-                    .filter(nombre => tiendas_validas.includes(nombre))  // FILTRO: solo tiendas válidas
                     .sort();
             } else {
-                // Fallback: extraer de empleados si no tenemos el API
                 const sucursalesSet = new Set();
                 allEmpleados.forEach(e => {
-                    if (e.sucursal_nombre && tiendas_validas.includes(e.sucursal_nombre)) {
+                    if (e.sucursal_nombre && isValidAnalystSucursal(e.sucursal_nombre, e.zona || e.zona_nombre || e.region)) {
                         sucursalesSet.add(e.sucursal_nombre);
                     }
                 });
@@ -1310,7 +1516,7 @@
             // Agregar botón especial para Inactivos
             const inactivosBtn = document.createElement('button');
             inactivosBtn.className = 'subtab-btn inactive-btn';
-            inactivosBtn.textContent = '🔒 Inactivos';
+            inactivosBtn.textContent = 'Inactivos';
             inactivosBtn.onclick = (event) => switchInactivos(event);
             inactivosBtn.style.background = '#f57c00';
             inactivosBtn.style.color = 'white';
@@ -1411,13 +1617,8 @@
             return key.replace(/_/g, ' ');
         }
 
-        function getZoneFromSucursalName(sucursalName) {
-            const target = normalizeTextBasic(sucursalName);
-            if (!target) return 'Sin_Zona';
-            if (ANALYST_SUCURSAL_TO_ZONE.has(target)) {
-                return ANALYST_SUCURSAL_TO_ZONE.get(target);
-            }
-            return 'Sin_Zona';
+        function getZoneFromSucursalName(sucursalName, zonaHint = '') {
+            return resolveAnalystZona(sucursalName, zonaHint);
         }
 
         function getAnalystZonaUsageRows(data) {
@@ -1448,8 +1649,8 @@
 
             const byZona = { ...base };
             (data.sucursal_usage || []).forEach(row => {
-                if (!isValidAnalystSucursal(row.sucursal)) return;
-                const zona = getZoneFromSucursalName(row.sucursal);
+                if (!isValidAnalystSucursal(row.sucursal, row.zona)) return;
+                const zona = getZoneFromSucursalName(row.sucursal, row.zona);
                 if (!byZona[zona]) {
                     byZona[zona] = { zona, facturas: 0, items: 0, sucursales: 0, avg_completion_minutes: 0, ordenes_finalizadas: 0 };
                 }
@@ -1489,8 +1690,8 @@
         function getFilteredSucursalUsage(data, selectedZona) {
             const rows = (data.sucursal_usage || []).map(row => ({
                 ...row,
-                zona: toSubtabZoneKey(row.zona || getZoneFromSucursalName(row.sucursal))
-            })).filter(row => isValidAnalystSucursal(row.sucursal));
+                zona: toSubtabZoneKey(row.zona || getZoneFromSucursalName(row.sucursal, row.zona))
+            })).filter(row => isValidAnalystSucursal(row.sucursal, row.zona));
 
             if (!selectedZona || selectedZona === 'ALL') return rows;
             return rows.filter(r => r.zona === selectedZona);
@@ -1544,7 +1745,7 @@
             const flat = [];
             groups.forEach(group => {
                 (group.sucursales || []).forEach(s => {
-                    if (!isValidAnalystSucursal(s.sucursal)) return;
+                    if (!isValidAnalystSucursal(s.sucursal, group.zona)) return;
                     flat.push({
                         zona: group.zona,
                         sucursal: s.sucursal || 'N/A',
@@ -1628,14 +1829,14 @@
                 : zonasRows.filter(z => z.zona === selectedZona);
 
             const sucCount = selectedZona === 'ALL'
-                ? (allSucursales || []).filter(s => s.activo !== false && isValidAnalystSucursal(s.nombre || s.sucursal_nombre || s.name)).length
+                ? (allSucursales || []).filter(s => s.activo !== false && isValidAnalystSucursal(s.nombre || s.sucursal_nombre || s.name, s.zona || s.zona_nombre || s.region)).length
                 : filteredRows.length;
 
             const activeEmpCount = (allEmpleados || []).filter(e => {
                 const isActive = e.activo === true || e.activo === 1;
                 if (!isActive) return false;
                 if (selectedZona === 'ALL') return true;
-                return getZoneFromSucursalName(e.sucursal_nombre || e.sucursal || '') === selectedZona;
+                return getZoneFromSucursalName(e.sucursal_nombre || e.sucursal || '', e.zona || e.zona_nombre || e.region) === selectedZona;
             }).length;
 
             const totalCompleted = selectedZoneRows.reduce((acc, z) => acc + Number(z.ordenes_finalizadas || 0), 0);
@@ -1819,11 +2020,10 @@
                     items.forEach(row => {
                         const sucursalNombre = (row.sucursal_nombre || row.sucursal || row.tienda || '').toString().trim();
                         if (!sucursalNombre) return;
-                        if (!isValidAnalystSucursal(sucursalNombre)) return;
-                        const zona = toSubtabZoneKey(
-                            row.zona ||
-                            (filteredSucursales.find(s => normalizeTextBasic(s.nombre || s.sucursal_nombre || s.name) === normalizeTextBasic(sucursalNombre)) || {}).zona ||
-                            'Sin Zona'
+                        if (!isValidAnalystSucursal(sucursalNombre, row.zona)) return;
+                        const zona = resolveAnalystZona(
+                            sucursalNombre,
+                            row.zona || (filteredSucursales.find(s => normalizeTextBasic(s.nombre || s.sucursal_nombre || s.name) === normalizeTextBasic(sucursalNombre)) || {}).zona || ''
                         );
 
                         const key = `${sucursalNombre}||${zona}`;
@@ -1855,8 +2055,8 @@
             const sucursal_login_by_zone_map = {};
             filteredSucursales.forEach(s => {
                 const name = s.nombre || s.sucursal_nombre || s.name;
-                if (!isValidAnalystSucursal(name)) return;
-                const zona = toSubtabZoneKey(s.zona || s.zona_nombre || s.region || 'Sin Zona');
+                if (!isValidAnalystSucursal(name, s.zona || s.zona_nombre || s.region)) return;
+                const zona = resolveAnalystZona(name, s.zona || s.zona_nombre || s.region || '');
                 if (!sucursal_login_by_zone_map[zona]) sucursal_login_by_zone_map[zona] = [];
                 sucursal_login_by_zone_map[zona].push({
                     sucursal: name || 'N/A',
@@ -2110,6 +2310,108 @@
             userDropdown.classList.toggle('active');
             userDropdownBtn.classList.toggle('active');
         }
+
+        // Sistema de alertas moderno que reemplaza los popups nativos.
+        function ensureAppNoticeStyle() {
+            if (document.getElementById('appNoticeStyle')) return;
+            const style = document.createElement('style');
+            style.id = 'appNoticeStyle';
+            style.textContent = `
+                .app-notice-stack {
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                    z-index: 99999;
+                    max-width: min(420px, calc(100vw - 32px));
+                }
+                .app-notice {
+                    background: #ffffff;
+                    color: #111;
+                    border: 1px solid #dfe6ef;
+                    border-left: 4px solid #2f6fed;
+                    border-radius: 12px;
+                    box-shadow: 0 12px 30px rgba(10, 38, 74, 0.18);
+                    padding: 12px 14px;
+                    font-size: 0.95rem;
+                    line-height: 1.35;
+                    animation: appNoticeIn 0.18s ease-out;
+                    display: grid;
+                    grid-template-columns: 1fr auto;
+                    gap: 10px;
+                    align-items: start;
+                }
+                .app-notice.success { border-left-color: #12805d; }
+                .app-notice.error { border-left-color: #c53333; }
+                .app-notice button {
+                    border: 1px solid #dfe6ef;
+                    background: #fff;
+                    color: #111;
+                    border-radius: 8px;
+                    padding: 4px 8px;
+                    cursor: pointer;
+                    font-size: 0.82rem;
+                    font-weight: 600;
+                }
+                @keyframes appNoticeIn {
+                    from { opacity: 0; transform: translateY(-6px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        function getAppNoticeType(message) {
+            const text = String(message || '').toLowerCase();
+            if (text.includes('error') || text.includes('fallo') || text.includes('no se pudo')) return 'error';
+            if (text.includes('exitosamente') || text.includes('correctamente') || text.includes('creado') || text.includes('actualizado')) return 'success';
+            return 'info';
+        }
+
+        function showAppNotice(message, type = 'info') {
+            ensureAppNoticeStyle();
+            let stack = document.getElementById('appNoticeStack');
+            if (!stack) {
+                stack = document.createElement('div');
+                stack.id = 'appNoticeStack';
+                stack.className = 'app-notice-stack';
+                document.body.appendChild(stack);
+            }
+
+            const notice = document.createElement('div');
+            notice.className = `app-notice ${type}`;
+
+            const text = document.createElement('div');
+            text.textContent = String(message || 'Mensaje');
+
+            const close = document.createElement('button');
+            close.type = 'button';
+            close.textContent = 'Aceptar';
+            close.onclick = () => notice.remove();
+
+            notice.appendChild(text);
+            notice.appendChild(close);
+            stack.appendChild(notice);
+
+            const timeoutMs = type === 'error' ? 7000 : 4500;
+            setTimeout(() => {
+                if (notice.isConnected) notice.remove();
+            }, timeoutMs);
+        }
+
+        if (!window.__paintflowAlertPatched) {
+            window.__paintflowAlertPatched = true;
+            window.__nativeAlert = window.alert.bind(window);
+            window.alert = (message) => {
+                try {
+                    showAppNotice(message, getAppNoticeType(message));
+                } catch (e) {
+                    window.__nativeAlert(String(message || ''));
+                }
+            };
+        }
         
         function goToFormulas() {
             // Verificar rol antes de navegar
@@ -2316,24 +2618,24 @@
                 if (userRole === 'administrador') {
                     // Administrador NO tiene acceso a fórmulas
                     dropdownContent = `
-                        <button onclick="window.location.href='/'" style="color: #333; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">🏠 Dashboard</button>
-                        <button onclick="window.location.href='/employees'" style="color: #333; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">👥 Gestión Empleados</button>
-                        <button onclick="abrirModalPerfil()" style="color: #333; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Perfil</button>
-                        <button onclick="handleLogout()" style="color: #d32f2f; background: none; padding: 12px 16px; border-top: 1px solid #eee; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Cerrar Sesión</button>
+                        <button onclick="window.location.href='/'" style="color: #111; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Dashboard</button>
+                        <button onclick="window.location.href='/employees'" style="color: #111; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Gestión Empleados</button>
+                        <button onclick="abrirModalPerfil()" style="color: #111; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Perfil</button>
+                        <button onclick="handleLogout()" style="color: #111; background: none; padding: 12px 16px; border-top: 1px solid #eee; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Cerrar Sesión</button>
                     `;
                 } else if (userRole === 'analista') {
                     // Analista solo tiene empleados y fórmulas
                     dropdownContent = `
-                        <button onclick="window.location.href='/employees'" style="color: #333; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">👥 Gestión Empleados</button>
-                        <button onclick="goToFormulas()" style="color: #333; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">🧪 Gestión Fórmulas</button>
-                        <button onclick="abrirModalPerfil()" style="color: #333; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Perfil</button>
-                        <button onclick="handleLogout()" style="color: #d32f2f; background: none; padding: 12px 16px; border-top: 1px solid #eee; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Cerrar Sesión</button>
+                        <button onclick="window.location.href='/employees'" style="color: #111; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Gestión Empleados</button>
+                        <button onclick="goToFormulas()" style="color: #111; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Gestión Fórmulas</button>
+                        <button onclick="abrirModalPerfil()" style="color: #111; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Perfil</button>
+                        <button onclick="handleLogout()" style="color: #111; background: none; padding: 12px 16px; border-top: 1px solid #eee; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Cerrar Sesión</button>
                     `;
                 } else {
                     // Rol por defecto
                     dropdownContent = `
-                        <button onclick="abrirModalPerfil()" style="color: #333; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Perfil</button>
-                        <button onclick="handleLogout()" style="color: #d32f2f; background: none; padding: 12px 16px; border-top: 1px solid #eee; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Cerrar Sesión</button>
+                        <button onclick="abrirModalPerfil()" style="color: #111; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Perfil</button>
+                        <button onclick="handleLogout()" style="color: #111; background: none; padding: 12px 16px; border-top: 1px solid #eee; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Cerrar Sesión</button>
                     `;
                 }
                 
@@ -2387,7 +2689,6 @@
                 container.innerHTML = `
                     <div class="no-results">
                         <div style="text-align: center; padding: 40px; color: #666;">
-                            <div style="font-size: 3em; margin-bottom: 10px;">🔍</div>
                             <h3>No se encontraron empleados</h3>
                             <p>No hay empleados que coincidan con "${searchTerm}"</p>
                             <button class="btn btn-primary" onclick="clearSearch()">Mostrar todos</button>
@@ -2442,7 +2743,7 @@
             const title = document.createElement('div');
             title.innerHTML = `
                 <div style="padding: 20px; background: #f8f9ff; border-bottom: 1px solid #e0e6ed;">
-                    <h3 style="margin: 0; color: #1a73e8;">📋 Resultados de búsqueda: ${empleados.length} empleado(s) encontrado(s)</h3>
+                    <h3 style="margin: 0; color: #1a73e8;">Resultados de búsqueda: ${empleados.length} empleado(s) encontrado(s)</h3>
                     <p style="margin: 5px 0 0 0; color: #666;">Búsqueda: "${searchTerm}"</p>
                 </div>
             `;
@@ -2492,7 +2793,7 @@
         async function showInactivosContent() {
             try {
                 const container = document.getElementById('tablasContainer');
-                container.innerHTML = '<div style="text-align: center; padding: 20px;">🔄 Cargando empleados inactivos...</div>';
+                container.innerHTML = '<div style="text-align: center; padding: 20px;">Cargando empleados inactivos...</div>';
                 
                 const response = await fetch(API + '/api/v1/empleados?mostrar_inactivos=true', {
                     headers: {
@@ -2516,7 +2817,6 @@
                 if (empleadosInactivos.length === 0) {
                     div.innerHTML = `
                         <div style="text-align: center; padding: 40px; color: #4CAF50;">
-                            <div style="font-size: 3em; margin-bottom: 20px;">✅</div>
                             <h3 style="color: #4CAF50; margin-bottom: 10px;">¡Excelente!</h3>
                             <p style="color: #666;">No hay empleados inactivos en el sistema</p>
                         </div>
@@ -2565,7 +2865,7 @@
                     
                     div.innerHTML = `
                         <div style="margin-bottom: 20px; padding: 15px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; color: #856404;">
-                            <div style="font-size: 1.1em; font-weight: bold; margin-bottom: 5px;">🔒 Empleados Inactivos</div>
+                            <div style="font-size: 1.1em; font-weight: bold; margin-bottom: 5px;">Empleados Inactivos</div>
                             <div>Se encontraron <strong>${empleadosInactivos.length}</strong> empleados inactivos. Puedes habilitarlos usando el botón "Habilitar".</div>
                         </div>
                     `;
@@ -2580,7 +2880,6 @@
                 const container = document.getElementById('tablasContainer');
                 container.innerHTML = `
                     <div style="text-align: center; padding: 40px; color: #dc3545;">
-                        <div style="font-size: 2em; margin-bottom: 20px;">❌</div>
                         <h3>Error al cargar empleados inactivos</h3>
                         <p>${error.message}</p>
                     </div>
@@ -2740,37 +3039,32 @@
         </style>
         <div class="profile-modal-content" style="background: #fff; width: 95%; max-width: 450px; border-radius: 20px; padding: 30px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
             <div class="profile-card">
-                <div class="profile-avatar">👤</div>
                 <h2 style="margin: 0; font-size: 1.4em; font-weight: 600;">Mi Perfil</h2>
                 <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 0.9em;">Información de la cuenta</p>
             </div>
             <div class="profile-field">
-                <div class="icon">👤</div>
                 <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 600; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Nombre Completo</label>
                 <input type="text" id="perfilNombre" readonly style="width: 100%; padding: 12px 10px; border-radius: 10px; background: #f8f9fa; color: #333; font-size: 1em; box-sizing: border-box;">
             </div>
             <div class="profile-field">
-                <div class="icon">📧</div>
                 <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 600; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Email</label>
                 <input type="text" id="perfilEmail" readonly style="width: 100%; padding: 12px 10px; border-radius: 10px; background: #f8f9fa; color: #333; font-size: 1em; box-sizing: border-box;">
             </div>
             <div class="profile-field">
-                <div class="icon">🔑</div>
                 <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 600; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Usuario</label>
                 <input type="text" id="perfilUsername" readonly style="width: 100%; padding: 12px 10px; border-radius: 10px; background: #f8f9fa; color: #333; font-size: 1em; box-sizing: border-box;">
             </div>
             <div class="profile-field">
-                <div class="icon">🎭</div>
                 <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 600; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Rol</label>
                 <input type="text" id="perfilRol" readonly style="width: 100%; padding: 12px 10px; border-radius: 10px; background: #f8f9fa; color: #333; font-size: 1em; box-sizing: border-box;">
             </div>
             
             <!-- Botón para abrir modal de cambio de contraseña -->
             <div style="text-align: center; margin: 25px 0;">
-                <button onclick="abrirModalPassword()" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border: none; padding: 12px 25px; border-radius: 10px; color: white; font-weight: 600; cursor: pointer; transition: all 0.3s ease; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(40, 167, 69, 0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(40, 167, 69, 0.3)';">🔒 Cambiar Contraseña</button>
+                <button onclick="abrirModalPassword()" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border: none; padding: 12px 25px; border-radius: 10px; color: white; font-weight: 600; cursor: pointer; transition: all 0.3s ease; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(40, 167, 69, 0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(40, 167, 69, 0.3)';">Cambiar Contraseña</button>
             </div>
             
-            <button onclick="cerrarModalPerfil()" class="btn-close-modal">✖️ Cerrar</button>
+            <button onclick="cerrarModalPerfil()" class="btn-close-modal">Cerrar</button>
         </div>
     </div>
 
@@ -2809,35 +3103,31 @@
         </style>
         <div class="password-modal-content" style="background: #fff; width: 95%; max-width: 420px; border-radius: 20px; padding: 30px; box-shadow: 0 20px 60px rgba(0,0,0,0.4);">
             <div class="password-header">
-                <div class="password-icon">🔐</div>
                 <h2 style="margin: 0; font-size: 1.3em; font-weight: 600;">Cambiar Contraseña</h2>
                 <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 0.9em;">Actualiza tu contraseña de acceso</p>
             </div>
             
             <div class="password-field" style="position: relative; margin-bottom: 20px;">
-                <div class="icon" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #28a745; font-size: 1.1em;">🔐</div>
                 <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 600; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Contraseña Actual *</label>
-                <input type="password" id="passwordActual" style="width: 100%; padding: 12px 12px 12px 40px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; box-sizing: border-box; transition: all 0.3s ease;" placeholder="Ingrese su contraseña actual" onfocus="this.style.borderColor='#28a745'; this.style.boxShadow='0 0 0 3px rgba(40, 167, 69, 0.1)';" onblur="this.style.borderColor='#e0e0e0'; this.style.boxShadow='none';">
+                <input type="password" id="passwordActual" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; box-sizing: border-box; transition: all 0.3s ease;" placeholder="Ingrese su contraseña actual" onfocus="this.style.borderColor='#28a745'; this.style.boxShadow='0 0 0 3px rgba(40, 167, 69, 0.1)';" onblur="this.style.borderColor='#e0e0e0'; this.style.boxShadow='none';">
             </div>
             
             <div class="password-field" style="position: relative; margin-bottom: 20px;">
-                <div class="icon" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #28a745; font-size: 1.1em;">🆕</div>
                 <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 600; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Nueva Contraseña *</label>
-                <input type="password" id="passwordNueva" style="width: 100%; padding: 12px 12px 12px 40px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; box-sizing: border-box; transition: all 0.3s ease;" placeholder="Ingrese nueva contraseña" onfocus="this.style.borderColor='#28a745'; this.style.boxShadow='0 0 0 3px rgba(40, 167, 69, 0.1)';" onblur="this.style.borderColor='#e0e0e0'; this.style.boxShadow='none';">
+                <input type="password" id="passwordNueva" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; box-sizing: border-box; transition: all 0.3s ease;" placeholder="Ingrese nueva contraseña" onfocus="this.style.borderColor='#28a745'; this.style.boxShadow='0 0 0 3px rgba(40, 167, 69, 0.1)';" onblur="this.style.borderColor='#e0e0e0'; this.style.boxShadow='none';">
             </div>
             
             <div class="password-field" style="position: relative; margin-bottom: 20px;">
-                <div class="icon" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #28a745; font-size: 1.1em;">✅</div>
                 <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 600; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Confirmar Nueva Contraseña *</label>
-                <input type="password" id="passwordConfirmar" style="width: 100%; padding: 12px 12px 12px 40px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; box-sizing: border-box; transition: all 0.3s ease;" placeholder="Confirme la nueva contraseña" onfocus="this.style.borderColor='#28a745'; this.style.boxShadow='0 0 0 3px rgba(40, 167, 69, 0.1)';" onblur="this.style.borderColor='#e0e0e0'; this.style.boxShadow='none';">
+                <input type="password" id="passwordConfirmar" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; box-sizing: border-box; transition: all 0.3s ease;" placeholder="Confirme la nueva contraseña" onfocus="this.style.borderColor='#28a745'; this.style.boxShadow='0 0 0 3px rgba(40, 167, 69, 0.1)';" onblur="this.style.borderColor='#e0e0e0'; this.style.boxShadow='none';">
             </div>
             
             <div id="errorPassword" style="color: #dc3545; font-size: 0.9em; margin-bottom: 15px; display: none; background: #f8d7da; padding: 12px; border-radius: 8px; border: 1px solid #f5c6cb; font-weight: 500;"></div>
             <div id="successPassword" style="color: #155724; font-size: 0.9em; margin-bottom: 15px; display: none; background: #d4edda; padding: 12px; border-radius: 8px; border: 1px solid #c3e6cb; font-weight: 500;"></div>
             
             <div style="display: flex; gap: 12px; margin-top: 25px;">
-                <button onclick="cambiarPassword()" style="flex: 1; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border: none; padding: 14px 20px; border-radius: 10px; color: white; font-weight: 600; cursor: pointer; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(40, 167, 69, 0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">🔄 Actualizar</button>
-                <button onclick="cerrarModalPassword()" style="background: #6c757d; border: none; padding: 14px 20px; border-radius: 10px; color: white; font-weight: 600; cursor: pointer; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(108, 117, 125, 0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">❌ Cancelar</button>
+                <button onclick="cambiarPassword()" style="flex: 1; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border: none; padding: 14px 20px; border-radius: 10px; color: white; font-weight: 600; cursor: pointer; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(40, 167, 69, 0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">Actualizar</button>
+                <button onclick="cerrarModalPassword()" style="background: #6c757d; border: none; padding: 14px 20px; border-radius: 10px; color: white; font-weight: 600; cursor: pointer; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(108, 117, 125, 0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">Cancelar</button>
             </div>
         </div>
     </div>

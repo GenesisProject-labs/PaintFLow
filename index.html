@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PaintFlow - Admin Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         /* Mejoras de diseño general */
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -953,6 +953,271 @@
             border-radius: 50%;
         }
 
+        :root {
+            --pf-ink: #13263d;
+            --pf-muted: #516277;
+            --pf-bg-1: #f8fbff;
+            --pf-bg-2: #eef4fb;
+            --pf-card: #ffffff;
+            --pf-line: #dfe6ef;
+            --pf-brand: #1a73e8;
+            --pf-brand-strong: #0f4ea8;
+            --pf-shadow: 0 14px 36px rgba(15, 40, 74, 0.12);
+        }
+
+        body {
+            font-family: Manrope, sans-serif;
+            color: var(--pf-ink);
+            background:
+                radial-gradient(1100px 560px at 8% -10%, #e3efff 0%, transparent 58%),
+                radial-gradient(820px 460px at 100% 0%, #e9f8f2 0%, transparent 46%),
+                linear-gradient(165deg, var(--pf-bg-1) 0%, var(--pf-bg-2) 100%);
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.9);
+            color: var(--pf-ink);
+            border-bottom: 1px solid var(--pf-line);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 10px 28px rgba(17, 48, 85, 0.08);
+            padding: 14px 24px;
+        }
+
+        .header-content {
+            width: 100%;
+            max-width: none;
+            margin: 0;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-section {
+            justify-self: start;
+        }
+
+        .navbar-tabs {
+            justify-self: center;
+        }
+
+        .user-menu {
+            justify-self: end;
+        }
+
+        .title,
+        .card-header,
+        .section-title,
+        h1,
+        h2,
+        h3 {
+            font-family: Space Grotesk, sans-serif;
+            letter-spacing: 0.01em;
+        }
+
+        .container,
+        .main-content,
+        .content-wrapper,
+        .content-card,
+        .dashboard-container,
+        .card,
+        .panel,
+        .modal-content {
+            background: var(--pf-card);
+            border: 1px solid var(--pf-line);
+            box-shadow: var(--pf-shadow);
+            border-radius: 16px;
+        }
+
+        .tabs-container,
+        .subtabs-container,
+        .filters,
+        .controls,
+        .search-section {
+            background: #ffffff;
+            border: 1px solid var(--pf-line);
+            border-radius: 14px;
+            box-shadow: 0 8px 22px rgba(15, 40, 74, 0.07);
+        }
+
+        .tab-btn,
+        .subtab-btn,
+        .btn,
+        .btn-primary,
+        .btn-secondary,
+        .login-btn,
+        .logout-btn,
+        .user-dropdown-btn {
+            border-radius: 12px;
+            transition: transform 0.2s ease, box-shadow 0.25s ease, opacity 0.2s ease;
+        }
+
+        .tab-btn:hover,
+        .subtab-btn:hover,
+        .btn:hover,
+        .login-btn:hover,
+        .logout-btn:hover,
+        .user-dropdown-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(15, 52, 95, 0.16);
+        }
+
+        table {
+            border: 1px solid var(--pf-line);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 8px 18px rgba(15, 40, 74, 0.08);
+        }
+
+        th {
+            background: #f6f9fe;
+            color: #2a4768;
+            border-bottom: 1px solid var(--pf-line);
+        }
+
+        td {
+            border-bottom: 1px solid #edf2f8;
+        }
+
+        input,
+        select,
+        textarea,
+        .search-input,
+        .form-control {
+            border: 1px solid var(--pf-line) !important;
+            border-radius: 10px;
+            background: #fff;
+            color: var(--pf-ink);
+        }
+
+        .dropdown-menu,
+        .user-dropdown {
+            background: #fff;
+            border: 1px solid var(--pf-line);
+            box-shadow: 0 14px 30px rgba(15, 40, 74, 0.14);
+            border-radius: 12px;
+        }
+
+        @keyframes pfFadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(14px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .container,
+        .main-content,
+        .content-card,
+        .dashboard-container,
+        .tab-content,
+        .subtab-content {
+            animation: pfFadeUp 0.35s ease both;
+        }
+
+        .user-menu,
+        .user-menu * {
+            color: var(--pf-ink);
+        }
+
+        .user-dropdown-btn {
+            background: #ffffff;
+            color: var(--pf-ink) !important;
+            border: 1px solid var(--pf-line) !important;
+            box-shadow: 0 8px 18px rgba(15, 40, 74, 0.1);
+        }
+
+        .user-dropdown-btn::after {
+            color: var(--pf-ink);
+        }
+
+        .user-avatar {
+            background: #e9f1ff;
+            color: #1f5fbf;
+        }
+
+        #adminUserName,
+        #userDisplayName {
+            color: var(--pf-ink) !important;
+            font-weight: 700;
+        }
+
+        .dropdown-menu a,
+        .dropdown-menu button,
+        .user-dropdown button {
+            color: #2f4661 !important;
+            font-weight: 600;
+        }
+
+        .dropdown-menu a:hover,
+        .dropdown-menu button:hover,
+        .user-dropdown button:hover {
+            background: #f2f7ff;
+            color: #164f99 !important;
+        }
+
+        .dropdown-menu button:last-child,
+        .user-dropdown button:last-child {
+            color: #111 !important;
+        }
+
+        body,
+        .header,
+        .header *,
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6,
+        p,
+        span,
+        label,
+        th,
+        td,
+        a,
+        .main-content,
+        .container,
+        .content-card,
+        .tabs-container,
+        .tab-content,
+        .dashboard-card,
+        .section-header,
+        .section-header h2,
+        .tab-btn,
+        .subtab-btn,
+        .btn,
+        .btn-link,
+        .btn-primary,
+        .btn-secondary,
+        .login-box,
+        .login-box * {
+            color: #111 !important;
+        }
+
+        .tab-btn,
+        .subtab-btn {
+            background: transparent !important;
+            border: 1px solid transparent !important;
+            border-bottom: 2px solid transparent !important;
+            border-radius: 8px !important;
+            box-shadow: none !important;
+            text-transform: none !important;
+            letter-spacing: 0 !important;
+            font-weight: 600;
+        }
+
+        .tab-btn.active,
+        .subtab-btn.active {
+            background: #fff !important;
+            border-color: #dfe6ef !important;
+            border-bottom-color: #111 !important;
+            color: #111 !important;
+        }
+
 
     </style>
 </head>
@@ -1366,8 +1631,26 @@ const zonas = {
     "Santo_Domingo": ["Bella Vista", "Churchill", "Tiradentes", "San Martin", "Luperon", "Arroyo Hondo", "San Isidro", "Alameda", "Zona Oriental", "Villa Mella"],
     "Zona_Este": ["Romana", "Punta Cana", "Bavaro"],
     "Zona_Norte": ["La Vega", "Puerto Plata", "San Francisco", "Terrenas", "Rafael Vidal", "Santiago Bartolome Colon"],
-    "Zona_Sur": ["Baní"]
+    "Zona_Sur": ["Bani"]
 };
+
+const ADMIN_STORE_ZONAS = {
+    Santo_Domingo: ['Tiradentes', 'Luperon', 'Churchill', 'Bella Vista', 'Zona Oriental', 'Arroyo Hondo', 'San Isidro', 'Villa Mella', 'Alameda', 'San Martin'],
+    Zona_Norte: ['Rafael Vidal', 'Rafel Vidal', 'Bartolome Colon', 'Santiago Bartolome Colon', 'Puerto Plata', 'Samana', 'Samaná', 'San Francisco', 'La Vega'],
+    Zona_Sur: ['Bani'],
+    Zona_Este: ['Punta Cana', 'Romana', 'Bavaro']
+};
+
+const ADMIN_STORE_ZONE_KEYS = Object.keys(ADMIN_STORE_ZONAS);
+const ADMIN_STORE_TO_ZONE = (() => {
+    const map = new Map();
+    ADMIN_STORE_ZONE_KEYS.forEach(zoneKey => {
+        (ADMIN_STORE_ZONAS[zoneKey] || []).forEach(name => {
+            map.set(normalizeTextBasic(name), zoneKey);
+        });
+    });
+    return map;
+})();
 
 
 // Guardar sesión en localStorage
@@ -1618,6 +1901,108 @@ function toggleUserMenu(event) {
     dropdown.classList.toggle("active");
 }
 
+// Sistema de alertas moderno que reemplaza los popups nativos.
+function ensureAppNoticeStyle() {
+    if (document.getElementById('appNoticeStyle')) return;
+    const style = document.createElement('style');
+    style.id = 'appNoticeStyle';
+    style.textContent = `
+        .app-notice-stack {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 99999;
+            max-width: min(420px, calc(100vw - 32px));
+        }
+        .app-notice {
+            background: #ffffff;
+            color: #111;
+            border: 1px solid #dfe6ef;
+            border-left: 4px solid #2f6fed;
+            border-radius: 12px;
+            box-shadow: 0 12px 30px rgba(10, 38, 74, 0.18);
+            padding: 12px 14px;
+            font-size: 0.95rem;
+            line-height: 1.35;
+            animation: appNoticeIn 0.18s ease-out;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            align-items: start;
+        }
+        .app-notice.success { border-left-color: #12805d; }
+        .app-notice.error { border-left-color: #c53333; }
+        .app-notice button {
+            border: 1px solid #dfe6ef;
+            background: #fff;
+            color: #111;
+            border-radius: 8px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+        @keyframes appNoticeIn {
+            from { opacity: 0; transform: translateY(-6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+function getAppNoticeType(message) {
+    const text = String(message || '').toLowerCase();
+    if (text.includes('error') || text.includes('fallo') || text.includes('no se pudo')) return 'error';
+    if (text.includes('exitosamente') || text.includes('correctamente') || text.includes('creado') || text.includes('actualizado')) return 'success';
+    return 'info';
+}
+
+function showAppNotice(message, type = 'info') {
+    ensureAppNoticeStyle();
+    let stack = document.getElementById('appNoticeStack');
+    if (!stack) {
+        stack = document.createElement('div');
+        stack.id = 'appNoticeStack';
+        stack.className = 'app-notice-stack';
+        document.body.appendChild(stack);
+    }
+
+    const notice = document.createElement('div');
+    notice.className = `app-notice ${type}`;
+
+    const text = document.createElement('div');
+    text.textContent = String(message || 'Mensaje');
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.textContent = 'Aceptar';
+    close.onclick = () => notice.remove();
+
+    notice.appendChild(text);
+    notice.appendChild(close);
+    stack.appendChild(notice);
+
+    const timeoutMs = type === 'error' ? 7000 : 4500;
+    setTimeout(() => {
+        if (notice.isConnected) notice.remove();
+    }, timeoutMs);
+}
+
+if (!window.__paintflowAlertPatched) {
+    window.__paintflowAlertPatched = true;
+    window.__nativeAlert = window.alert.bind(window);
+    window.alert = (message) => {
+        try {
+            showAppNotice(message, getAppNoticeType(message));
+        } catch (e) {
+            window.__nativeAlert(String(message || ''));
+        }
+    };
+}
+
 // Cerrar menú cuando se haga click fuera
 document.addEventListener("click", function(event) {
     const userMenu = document.querySelector(".user-menu-container");
@@ -1782,8 +2167,6 @@ let labelsCompletionByZoneChart = null;
 let labelsMetricsCache = null;
 let labelsMetricsLoading = false;
 let labelsLastRenderSignature = '';
-let labelsMetricsInFlight = null;
-let labelsLastFetchMs = 0;
 
 // Función para actualizar gráficas del dashboard
 function updateDashboardCharts() {
@@ -1847,6 +2230,43 @@ function getZonaFromSucursalName(sucursalName) {
         }
     }
     return 'Sin_Zona';
+}
+
+function isAdminStoreSucursal(sucursal) {
+    if (!sucursal) return false;
+    const nombre = sucursal.nombre || sucursal.sucursal_nombre || sucursal.name || '';
+    const raw = String(nombre || '');
+    const normalized = normalizeTextBasic(raw);
+    if ((normalized === 'bani' || normalized === 'bavaro') && /[íá]/i.test(raw)) return false;
+    const target = normalizeTextBasic(nombre);
+    if (!target) return false;
+
+    if (ADMIN_STORE_TO_ZONE.has(target)) return true;
+
+    const zonaField = toSubtabZoneKey(sucursal.zona || sucursal.zona_nombre || sucursal.region || '');
+    if (ADMIN_STORE_ZONE_KEYS.includes(zonaField)) {
+        return (ADMIN_STORE_ZONAS[zonaField] || []).some(name => normalizeTextBasic(name) === target);
+    }
+
+    return false;
+}
+
+function getAdminStoreSucursales() {
+    return (allSucursales || []).filter(isAdminStoreSucursal);
+}
+
+function sucursalBelongsToZona(sucursal, zonaKey) {
+    if (!sucursal || !zonaKey) return false;
+
+    // Fuente principal: zona guardada en DB.
+    const zonaFromField = toSubtabZoneKey(sucursal.zona || sucursal.zona_nombre || sucursal.region || '');
+    if (zonaFromField !== 'Sin_Zona') {
+        return zonaFromField === zonaKey;
+    }
+
+    // Fallback: compatibilidad con mapeo por nombre.
+    const zonaFromName = getZonaFromSucursalName(sucursal.nombre || sucursal.sucursal_nombre || sucursal.name || '');
+    return zonaFromName === zonaKey;
 }
 
 function renderLabelsProductList(elementId, rows) {
@@ -2274,43 +2694,31 @@ async function mapWithConcurrency(items, limit, mapper) {
 }
 
 async function buildFallbackLabelsMetrics() {
-    let sucursales = Array.isArray(allSucursales) ? allSucursales : [];
-    if (!sucursales.length) {
-        const sucRes = await fetchWithTimeout(API + '/api/v1/sucursales', 3000);
-        if (sucRes.ok) {
-            const sucData = await sucRes.json();
-            sucursales = Array.isArray(sucData.sucursales) ? sucData.sucursales : [];
-        }
-    }
+    const sucRes = await fetchWithTimeout(API + '/api/v1/sucursales', 5000);
+    if (!sucRes.ok) throw new Error('No se pudo consultar sucursales para fallback');
+    const sucData = await sucRes.json();
+    const sucursales = Array.isArray(sucData.sucursales) ? sucData.sucursales : [];
 
     const filteredSucursales = sucursales.filter(s => (s && (s.nombre || '').trim()));
-    const sucursalUsageMap = {};
 
-    // Fallback rapido: una sola llamada global, agregando localmente por sucursal/zona.
-    try {
-        const qRes = await fetchWithTimeout(API + '/api/v1/labelsapp/live-queue?limit=500', 2500);
-        if (qRes.ok) {
+    const requests = await mapWithConcurrency(filteredSucursales, 4, async suc => {
+        const sucursalNombre = suc.nombre || 'N/A';
+        const zona = toSubtabZoneKey(suc.zona || getZonaFromSucursalName(sucursalNombre));
+        const slug = normalizeSucursalSlug(sucursalNombre);
+        try {
+            const qRes = await fetchWithTimeout(API + `/api/v1/labelsapp/live-queue?sucursal=${encodeURIComponent(slug)}&limit=250`, 4500);
+            if (!qRes.ok) return { sucursal: sucursalNombre, zona, facturas: 0, items: 0 };
             const queue = await qRes.json();
-            const items = Array.isArray(queue.items) ? queue.items : (Array.isArray(queue.queue) ? queue.queue : []);
-            items.forEach(row => {
-                const sucursalNombre = (row.sucursal_nombre || row.sucursal || row.tienda || '').toString().trim();
-                if (!sucursalNombre) return;
-
-                const zona = toSubtabZoneKey(row.zona || getZonaFromSucursalName(sucursalNombre));
-                const key = `${sucursalNombre}||${zona}`;
-
-                if (!sucursalUsageMap[key]) {
-                    sucursalUsageMap[key] = { sucursal: sucursalNombre, zona, facturas: 0, items: 0 };
-                }
-
-                sucursalUsageMap[key].facturas += 1;
-                sucursalUsageMap[key].items += Number(row.items || row.cantidad || 1);
-            });
+            const items = Array.isArray(queue.items) ? queue.items : [];
+            const facturas = Number(queue.total || items.length || 0);
+            const totalItems = items.reduce((acc, row) => acc + Number(row.items || 0), 0);
+            return { sucursal: sucursalNombre, zona, facturas, items: totalItems };
+        } catch (_) {
+            return { sucursal: sucursalNombre, zona, facturas: 0, items: 0 };
         }
-    } catch (_) {}
+    });
 
-    const sucursal_usage = Object.values(sucursalUsageMap)
-        .filter(r => Number(r.facturas || 0) > 0 || Number(r.items || 0) > 0);
+    const sucursal_usage = requests.filter(r => Number(r.facturas || 0) > 0 || Number(r.items || 0) > 0);
     sucursal_usage.sort((a, b) => (Number(b.facturas || 0) - Number(a.facturas || 0)) || (Number(b.items || 0) - Number(a.items || 0)));
 
     const zonaMap = {};
@@ -2346,119 +2754,80 @@ async function buildFallbackLabelsMetrics() {
 }
 
 async function updateLabelsAppUsageMetrics() {
-    if (labelsMetricsInFlight) return labelsMetricsInFlight;
-    const statusEl = document.getElementById('labelsMetricStatus');
+    if (labelsMetricsLoading) return;
     labelsMetricsLoading = true;
 
-    const cached = getCachedLabelsMetrics();
-    if (cached) {
-        labelsMetricsCache = cached;
-        updateLabelsZoneSelector(cached);
-        updateLabelsZoneView();
+    const statusEl = document.getElementById('labelsMetricStatus');
+    try {
+        const cached = getCachedLabelsMetrics();
+        if (cached) {
+            labelsMetricsCache = cached;
+            updateLabelsZoneSelector(cached);
+            updateLabelsZoneView();
+            if (statusEl) statusEl.textContent = 'Mostrando cache, actualizando datos...';
+        } else if (statusEl) {
+            statusEl.textContent = 'Cargando métricas...';
+        }
+
+        const res = await fetchWithTimeout(API + '/api/v1/labelsapp/usage-metrics?product_limit=5', 5000);
+        if (!res.ok) {
+            let detail = '';
+            try {
+                const body = await res.json();
+                detail = body.detail || '';
+            } catch (_) {}
+            throw new Error(detail || 'No se pudo cargar métricas de LabelsApp');
+        }
+        const data = await res.json();
+        labelsMetricsCache = data;
+        setCachedLabelsMetrics(data);
 
         const lastLoginEl = document.getElementById('labelsLastLogin');
-        if (lastLoginEl && cached.last_login && cached.last_login.fecha_hora_login) {
-            const dt = new Date(cached.last_login.fecha_hora_login);
-            const fecha = dt.toLocaleDateString('es-DO');
-            const hora = dt.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
-            const username = cached.last_login.username || 'N/A';
-            lastLoginEl.textContent = `${username} · ${fecha} ${hora}`;
+
+        if (lastLoginEl) {
+            if (data.last_login && data.last_login.fecha_hora_login) {
+                const dt = new Date(data.last_login.fecha_hora_login);
+                const fecha = dt.toLocaleDateString('es-DO');
+                const hora = dt.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
+                const username = data.last_login.username || 'N/A';
+                lastLoginEl.textContent = `${username} · ${fecha} ${hora}`;
+            } else {
+                lastLoginEl.textContent = 'Sin registros';
+            }
         }
 
-        const cacheIsVeryFresh = (Date.now() - labelsLastFetchMs) < 30000;
-        if (cacheIsVeryFresh) {
-            if (statusEl) statusEl.textContent = `Actualizado (cache): ${new Date().toLocaleTimeString('es-DO')}`;
-            labelsMetricsLoading = false;
-            return;
-        }
+        renderLabelsProductList('labelsTopProducts', data.top_products || []);
+        renderLabelsProductList('labelsLowProducts', data.low_products || []);
+        updateLabelsZoneSelector(data);
+        updateLabelsZoneView();
 
-        if (statusEl) statusEl.textContent = 'Mostrando cache, actualizando datos...';
-    } else if (statusEl) {
-        statusEl.textContent = 'Cargando métricas...';
-    }
-
-    labelsMetricsInFlight = (async () => {
+        if (statusEl) statusEl.textContent = `Actualizado: ${new Date().toLocaleTimeString('es-DO')}`;
+    } catch (e) {
+        console.error('Error metrics labelsapp:', e);
         try {
-            const res = await fetchWithTimeout(API + '/api/v1/labelsapp/usage-metrics?product_limit=5', 3500);
-            if (!res.ok) {
-                let detail = '';
-                try {
-                    const body = await res.json();
-                    detail = body.detail || '';
-                } catch (_) {}
-                throw new Error(detail || 'No se pudo cargar métricas de LabelsApp');
-            }
-            const data = await res.json();
-            labelsMetricsCache = data;
-            setCachedLabelsMetrics(data);
-            labelsLastFetchMs = Date.now();
-
+            const fallbackData = await buildFallbackLabelsMetrics();
+            labelsMetricsCache = fallbackData;
+            setCachedLabelsMetrics(fallbackData);
             const lastLoginEl = document.getElementById('labelsLastLogin');
-            if (lastLoginEl) {
-                if (data.last_login && data.last_login.fecha_hora_login) {
-                    const dt = new Date(data.last_login.fecha_hora_login);
-                    const fecha = dt.toLocaleDateString('es-DO');
-                    const hora = dt.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
-                    const username = data.last_login.username || 'N/A';
-                    lastLoginEl.textContent = `${username} · ${fecha} ${hora}`;
-                } else {
-                    lastLoginEl.textContent = 'Sin registros';
-                }
-            }
-
-            renderLabelsProductList('labelsTopProducts', data.top_products || []);
-            renderLabelsProductList('labelsLowProducts', data.low_products || []);
-            updateLabelsZoneSelector(data);
+            if (lastLoginEl) lastLoginEl.textContent = 'No disponible (modo live)';
+            renderLabelsProductList('labelsTopProducts', [{ producto: 'No disponible en modo live', cantidad: 0 }]);
+            renderLabelsProductList('labelsLowProducts', [{ producto: 'No disponible en modo live', cantidad: 0 }]);
+            updateLabelsZoneSelector(fallbackData);
             updateLabelsZoneView();
-
-            if (statusEl) statusEl.textContent = `Actualizado: ${new Date().toLocaleTimeString('es-DO')}`;
-        } catch (e) {
-            console.error('Error metrics labelsapp:', e);
-            try {
-                const fallbackData = await buildFallbackLabelsMetrics();
-                const mergedFallback = {
-                    ...fallbackData,
-                    zone_top_products: Array.isArray(cached?.zone_top_products) && cached.zone_top_products.length
-                        ? cached.zone_top_products
-                        : fallbackData.zone_top_products,
-                    sucursal_login_by_zone: Array.isArray(cached?.sucursal_login_by_zone) && cached.sucursal_login_by_zone.length
-                        ? cached.sucursal_login_by_zone
-                        : fallbackData.sucursal_login_by_zone,
-                    top_products: Array.isArray(cached?.top_products) && cached.top_products.length
-                        ? cached.top_products
-                        : fallbackData.top_products,
-                    low_products: Array.isArray(cached?.low_products) && cached.low_products.length
-                        ? cached.low_products
-                        : fallbackData.low_products,
-                    last_login: cached?.last_login || fallbackData.last_login,
-                };
-
-                labelsMetricsCache = mergedFallback;
-                labelsLastFetchMs = Date.now();
-                const lastLoginEl = document.getElementById('labelsLastLogin');
-                if (lastLoginEl) lastLoginEl.textContent = 'No disponible (modo live)';
-                renderLabelsProductList('labelsTopProducts', mergedFallback.top_products?.length ? mergedFallback.top_products : [{ producto: 'No disponible en modo live', cantidad: 0 }]);
-                renderLabelsProductList('labelsLowProducts', mergedFallback.low_products?.length ? mergedFallback.low_products : [{ producto: 'No disponible en modo live', cantidad: 0 }]);
-                updateLabelsZoneSelector(mergedFallback);
-                updateLabelsZoneView();
-                if (statusEl) {
-                    statusEl.textContent = `Modo fallback activo: métricas live por zonas (con cache de respaldo) (${new Date().toLocaleTimeString('es-DO')})`;
-                }
-            } catch (fallbackError) {
-                const lastLoginEl = document.getElementById('labelsLastLogin');
-                if (lastLoginEl) lastLoginEl.textContent = 'Error cargando métricas';
-                renderLabelsProductList('labelsTopProducts', []);
-                renderLabelsProductList('labelsLowProducts', []);
-                renderLabelsUsageTable([]);
-                if (statusEl) statusEl.textContent = `Error: ${fallbackError.message || e.message || 'No se pudo cargar la vista general'}`;
+            if (statusEl) {
+                statusEl.textContent = `Modo fallback activo: métricas live por zonas (${new Date().toLocaleTimeString('es-DO')})`;
             }
-        } finally {
-            labelsMetricsInFlight = null;
-            labelsMetricsLoading = false;
+        } catch (fallbackError) {
+            const lastLoginEl = document.getElementById('labelsLastLogin');
+            if (lastLoginEl) lastLoginEl.textContent = 'Error cargando métricas';
+            renderLabelsProductList('labelsTopProducts', []);
+            renderLabelsProductList('labelsLowProducts', []);
+            renderLabelsUsageTable([]);
+            if (statusEl) statusEl.textContent = `Error: ${fallbackError.message || e.message || 'No se pudo cargar la vista general'}`;
         }
-    })();
-
-    return labelsMetricsInFlight;
+    } finally {
+        labelsMetricsLoading = false;
+    }
 }
 
 // Función para actualizar gráfica de empleados por sucursal por zona
@@ -2470,14 +2839,8 @@ function updateEmpleadosPorSucursalChart() {
     
     console.log('  - Zona seleccionada para empleados:', zonaSeleccionada);
     
-    // Obtener sucursales de la zona seleccionada usando el mismo objeto zonas
-    const sucursalesDeZona = zonas[zonaSeleccionada] || [];
-    console.log('  - Sucursales de la zona:', sucursalesDeZona);
-    
-    // Filtrar allSucursales para obtener solo las de la zona
-    const sucursalesFiltradas = allSucursales.filter(s => 
-        sucursalesDeZona.includes(s.nombre)
-    );
+    // Filtrar solo tiendas operativas de la zona seleccionada.
+    const sucursalesFiltradas = getAdminStoreSucursales().filter(s => sucursalBelongsToZona(s, zonaSeleccionada));
     
     console.log('  - Sucursales filtradas:', sucursalesFiltradas.map(s => s.nombre));
     
@@ -2535,10 +2898,7 @@ function updateZonaChart() {
     console.log('✓ updateZonaChart ejecutándose para zona:', zonaSeleccionada);
     
     // Filtrar sucursales por zona seleccionada (usando la misma lógica que las pestañas)
-    const sucursalesZona = zonas[zonaSeleccionada] || [];
-    const sucursalesDeZona = allSucursales.filter(s => 
-        sucursalesZona.some(sZ => sZ.toLowerCase() === s.nombre.toLowerCase())
-    );
+    const sucursalesDeZona = getAdminStoreSucursales().filter(s => sucursalBelongsToZona(s, zonaSeleccionada));
     console.log('  - Sucursales en', zonaSeleccionada + ':', sucursalesDeZona.length);
     console.log('  - Nombres:', sucursalesDeZona.map(s => s.nombre));
     
@@ -2681,11 +3041,8 @@ function switchRol(evt, rol) {
 }
 
 function renderZonaSucursales(zona) {
-    const sucursalesZona = zonas[zona] || [];
     const tableBody = document.getElementById("tbody-" + zona);
-    const sucursalesFiltradas = allSucursales.filter(s => 
-        sucursalesZona.some(sZ => sZ.toLowerCase() === s.nombre.toLowerCase())
-    );
+    const sucursalesFiltradas = getAdminStoreSucursales().filter(s => sucursalBelongsToZona(s, zona));
     if (sucursalesFiltradas.length > 0) {
         tableBody.innerHTML = sucursalesFiltradas.map(s => {
             const isActive = s.estado === "activa" || s.estado === "Activa";
@@ -2754,10 +3111,11 @@ async function loadSucursales() {
         if (!res.ok) throw new Error('Error fetching sucursales');
         const data = await res.json();
         allSucursales = data.sucursales || [];
+        const storeSucursales = getAdminStoreSucursales();
         const totalSucEl = document.getElementById("totalSucursales");
-        if (totalSucEl) totalSucEl.textContent = data.total || 0;
+        if (totalSucEl) totalSucEl.textContent = storeSucursales.length || 0;
         Object.keys(zonas).forEach(zona => renderZonaSucursales(zona));
-        console.log('Sucursales loaded:', allSucursales.length);
+        console.log('Sucursales loaded (stores only):', storeSucursales.length);
     } catch (e) { 
         console.error('Error loading sucursales:', e);
         const totalSucEl = document.getElementById("totalSucursales");
@@ -3077,30 +3435,13 @@ async function loadData() {
             if (resSuc.ok) {
                 const dataSuc = await resSuc.json();
                 allSucursales = dataSuc.sucursales || [];
-                
-                // Filtrar solo sucursales que son tiendas (están en zonas) y están activas
-                const sucursalesTiendas = Object.values(zonas).flat(); // ["Bella Vista", "Churchill", ...]
-                
-                // Función para normalizar nombres (sin acentos, lowercase)
-                const normalizar = (str) => str.toLowerCase()
-                    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-                    .replace(/\s+/g, " ").trim();
-                
-                const sucursalesNormalizadas = sucursalesTiendas.map(normalizar);
-                
-                const sucursalesActivas = allSucursales.filter(s => {
-                    // Verificar que esté activa usando el campo estado
-                    if (s.estado !== "activa") return false;
-                    
-                    const nombreNormalizado = normalizar(s.nombre);
-                    return sucursalesNormalizadas.includes(nombreNormalizado);
-                });
+                const sucursalesActivas = getAdminStoreSucursales().filter(s => s.estado === "activa");
                 
                 const totalEl = document.getElementById("totalSucursales");
                 if (totalEl) totalEl.textContent = sucursalesActivas.length;
                 console.log('✓ Sucursales tiendas activas:', sucursalesActivas.length);
                 console.log('  - Nombres encontrados:', sucursalesActivas.map(s => s.nombre));
-                console.log('  - Buscando:', sucursalesTiendas);
+                console.log('  - Catálogo permitido:', Object.values(ADMIN_STORE_ZONAS).flat());
             }
         } catch (e) {
             console.warn('Warning loading sucursales:', e);
@@ -3504,7 +3845,11 @@ function testRenderUsuarios() {
     function cargarSucursalesEnModal() {
         const select = document.getElementById('sucursalInput');
         select.innerHTML = '<option value="">-- Seleccionar --</option>';
-        allSucursales.forEach(s => {
+        const sucursalesUsuario = Array.isArray(allSucursales)
+            ? [...allSucursales].filter(Boolean).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'))
+            : [];
+
+        sucursalesUsuario.forEach(s => {
             const opt = document.createElement('option');
             opt.value = s.id;
             opt.textContent = s.nombre;
@@ -3706,9 +4051,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (userRole === 'administrador') {
                 // Menú completo para administradores
                 dropdown.innerHTML = `
-                    <button onclick="window.location.href='/'" style="color: #fff; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">🏠 Dashboard</button>
-                    <button onclick="goToAnalystView()" style="color: #fff; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">👥 Gestión Empleados</button>
-                    <button onclick="goToFormulas()" style="color: #fff; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">🧪 Gestión Fórmulas</button>
+                    <button onclick="window.location.href='/'" style="color: #111; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Dashboard</button>
+                    <button onclick="goToAnalystView()" style="color: #111; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Gestión Empleados</button>
+                    <button onclick="goToFormulas()" style="color: #111; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Gestión Fórmulas</button>
                     ${baseButtons}
                 `;
                 
@@ -3722,9 +4067,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             } else if (userRole === 'analista') {
                 // Solo fórmulas para analistas
                 dropdown.innerHTML = `
-                    <button onclick="goToAnalystView()" style="color: #fff; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">👥 Gestión Empleados</button>
-                    <button onclick="goToFormulas()" style="color: #fff; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">🧪 Gestión Fórmulas</button>
-                    <button onclick="goToLabelsAppWeb()" style="color: #fff; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">🏷️ LabelsApp Web</button>
+                    <button onclick="goToAnalystView()" style="color: #111; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Gestión Empleados</button>
+                    <button onclick="goToFormulas()" style="color: #111; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">Gestión Fórmulas</button>
+                    <button onclick="goToLabelsAppWeb()" style="color: #111; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">LabelsApp Web</button>
                     ${baseButtons}
                 `;
                 
@@ -3738,7 +4083,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             } else if (userRole === 'facturador' || userRole === 'cajero') {
                 // Menú de operación para tienda
                 dropdown.innerHTML = `
-                    <button onclick="goToLabelsAppWeb()" style="color: #fff; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">🏷️ LabelsApp Web</button>
+                    <button onclick="goToLabelsAppWeb()" style="color: #111; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">LabelsApp Web</button>
                     ${baseButtons}
                 `;
 
@@ -3929,37 +4274,32 @@ document.addEventListener('DOMContentLoaded', async function() {
             </style>
             <div class="profile-modal-content" style="background: #fff; width: 95%; max-width: 450px; border-radius: 20px; padding: 30px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
                 <div class="profile-card">
-                    <div class="profile-avatar">👤</div>
                     <h2 style="margin: 0; font-size: 1.4em; font-weight: 600;">Mi Perfil</h2>
                     <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 0.9em;">Información de la cuenta</p>
                 </div>
                 <div class="profile-field">
-                    <div class="icon">👤</div>
                     <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 600; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Nombre Completo</label>
                     <input type="text" id="perfilNombre" readonly style="width: 100%; padding: 12px 10px; border-radius: 10px; background: #f8f9fa; color: #333; font-size: 1em; box-sizing: border-box;">
                 </div>
                 <div class="profile-field">
-                    <div class="icon">📧</div>
                     <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 600; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Email</label>
                     <input type="text" id="perfilEmail" readonly style="width: 100%; padding: 12px 10px; border-radius: 10px; background: #f8f9fa; color: #333; font-size: 1em; box-sizing: border-box;">
                 </div>
                 <div class="profile-field">
-                    <div class="icon">🔑</div>
                     <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 600; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Usuario</label>
                     <input type="text" id="perfilUsername" readonly style="width: 100%; padding: 12px 10px; border-radius: 10px; background: #f8f9fa; color: #333; font-size: 1em; box-sizing: border-box;">
                 </div>
                 <div class="profile-field">
-                    <div class="icon">🎭</div>
                     <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 600; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Rol</label>
                     <input type="text" id="perfilRol" readonly style="width: 100%; padding: 12px 10px; border-radius: 10px; background: #f8f9fa; color: #333; font-size: 1em; box-sizing: border-box;">
                 </div>
                 
                 <!-- Botón para abrir modal de cambio de contraseña -->
                 <div style="text-align: center; margin: 25px 0;">
-                    <button onclick="abrirModalPassword()" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border: none; padding: 12px 25px; border-radius: 10px; color: white; font-weight: 600; cursor: pointer; transition: all 0.3s ease; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(40, 167, 69, 0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(40, 167, 69, 0.3)';">🔒 Cambiar Contraseña</button>
+                    <button onclick="abrirModalPassword()" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border: none; padding: 12px 25px; border-radius: 10px; color: white; font-weight: 600; cursor: pointer; transition: all 0.3s ease; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(40, 167, 69, 0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(40, 167, 69, 0.3)';">Cambiar Contraseña</button>
                 </div>
                 
-                <button onclick="cerrarModalPerfil()" class="btn-close-modal">✖️ Cerrar</button>
+                <button onclick="cerrarModalPerfil()" class="btn-close-modal">Cerrar</button>
             </div>
         </div>
 
@@ -3998,35 +4338,31 @@ document.addEventListener('DOMContentLoaded', async function() {
         </style>
         <div class="password-modal-content" style="background: #fff; width: 95%; max-width: 420px; border-radius: 20px; padding: 30px; box-shadow: 0 20px 60px rgba(0,0,0,0.4);">
             <div class="password-header">
-                <div class="password-icon">🔐</div>
                 <h2 style="margin: 0; font-size: 1.3em; font-weight: 600;">Cambiar Contraseña</h2>
                 <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 0.9em;">Actualiza tu contraseña de acceso</p>
             </div>
             
             <div class="password-field" style="position: relative; margin-bottom: 20px;">
-                <div class="icon" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #28a745; font-size: 1.1em;">🔐</div>
                 <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 600; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Contraseña Actual *</label>
-                <input type="password" id="passwordActual" style="width: 100%; padding: 12px 12px 12px 40px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; box-sizing: border-box; transition: all 0.3s ease;" placeholder="Ingrese su contraseña actual" onfocus="this.style.borderColor='#28a745'; this.style.boxShadow='0 0 0 3px rgba(40, 167, 69, 0.1)';" onblur="this.style.borderColor='#e0e0e0'; this.style.boxShadow='none';">
+                <input type="password" id="passwordActual" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; box-sizing: border-box; transition: all 0.3s ease;" placeholder="Ingrese su contraseña actual" onfocus="this.style.borderColor='#28a745'; this.style.boxShadow='0 0 0 3px rgba(40, 167, 69, 0.1)';" onblur="this.style.borderColor='#e0e0e0'; this.style.boxShadow='none';">
             </div>
             
             <div class="password-field" style="position: relative; margin-bottom: 20px;">
-                <div class="icon" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #28a745; font-size: 1.1em;">🆕</div>
                 <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 600; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Nueva Contraseña *</label>
-                <input type="password" id="passwordNueva" style="width: 100%; padding: 12px 12px 12px 40px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; box-sizing: border-box; transition: all 0.3s ease;" placeholder="Ingrese nueva contraseña" onfocus="this.style.borderColor='#28a745'; this.style.boxShadow='0 0 0 3px rgba(40, 167, 69, 0.1)';" onblur="this.style.borderColor='#e0e0e0'; this.style.boxShadow='none';">
+                <input type="password" id="passwordNueva" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; box-sizing: border-box; transition: all 0.3s ease;" placeholder="Ingrese nueva contraseña" onfocus="this.style.borderColor='#28a745'; this.style.boxShadow='0 0 0 3px rgba(40, 167, 69, 0.1)';" onblur="this.style.borderColor='#e0e0e0'; this.style.boxShadow='none';">
             </div>
             
             <div class="password-field" style="position: relative; margin-bottom: 20px;">
-                <div class="icon" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #28a745; font-size: 1.1em;">✅</div>
                 <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 600; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Confirmar Nueva Contraseña *</label>
-                <input type="password" id="passwordConfirmar" style="width: 100%; padding: 12px 12px 12px 40px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; box-sizing: border-box; transition: all 0.3s ease;" placeholder="Confirme la nueva contraseña" onfocus="this.style.borderColor='#28a745'; this.style.boxShadow='0 0 0 3px rgba(40, 167, 69, 0.1)';" onblur="this.style.borderColor='#e0e0e0'; this.style.boxShadow='none';">
+                <input type="password" id="passwordConfirmar" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; box-sizing: border-box; transition: all 0.3s ease;" placeholder="Confirme la nueva contraseña" onfocus="this.style.borderColor='#28a745'; this.style.boxShadow='0 0 0 3px rgba(40, 167, 69, 0.1)';" onblur="this.style.borderColor='#e0e0e0'; this.style.boxShadow='none';">
             </div>
             
             <div id="errorPassword" style="color: #dc3545; font-size: 0.9em; margin-bottom: 15px; display: none; background: #f8d7da; padding: 12px; border-radius: 8px; border: 1px solid #f5c6cb; font-weight: 500;"></div>
             <div id="successPassword" style="color: #155724; font-size: 0.9em; margin-bottom: 15px; display: none; background: #d4edda; padding: 12px; border-radius: 8px; border: 1px solid #c3e6cb; font-weight: 500;"></div>
             
             <div style="display: flex; gap: 12px; margin-top: 25px;">
-                <button onclick="cambiarPassword()" style="flex: 1; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border: none; padding: 14px 20px; border-radius: 10px; color: white; font-weight: 600; cursor: pointer; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(40, 167, 69, 0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">🔄 Actualizar</button>
-                <button onclick="cerrarModalPassword()" style="background: #6c757d; border: none; padding: 14px 20px; border-radius: 10px; color: white; font-weight: 600; cursor: pointer; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(108, 117, 125, 0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">❌ Cancelar</button>
+                <button onclick="cambiarPassword()" style="flex: 1; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border: none; padding: 14px 20px; border-radius: 10px; color: white; font-weight: 600; cursor: pointer; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(40, 167, 69, 0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">Actualizar</button>
+                <button onclick="cerrarModalPassword()" style="background: #6c757d; border: none; padding: 14px 20px; border-radius: 10px; color: white; font-weight: 600; cursor: pointer; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(108, 117, 125, 0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">Cancelar</button>
             </div>
         </div>
     </div>

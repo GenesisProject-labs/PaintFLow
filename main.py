@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException, Depends, Request, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+import json
 import logging
 from datetime import datetime
 import csv
@@ -66,6 +67,7 @@ class LabelsAppItem(BaseModel):
 
 class LabelsAppSendRequest(BaseModel):
     id_factura: str
+    id_cliente: Optional[str] = None
     prioridad: str = "Media"
     username: Optional[str] = None
     usuario_id: Optional[int] = None
@@ -86,6 +88,7 @@ class LabelsAppFacturaPriorityRequest(BaseModel):
 
 class LabelsAppFacturaItemsUpdateRequest(BaseModel):
     prioridad: Optional[str] = None
+    id_cliente: Optional[str] = None
     items: List[LabelsAppItem]
 
 from config import settings
@@ -149,6 +152,15 @@ else:
 async def startup_event():
     logger.info("Starting PaintFlow API...")
     DatabasePool.init_pool()
+    try:
+        db = DatabasePool.get_connection()
+        try:
+            _ensure_labelsapp_history_table(db)
+            db.commit()
+        finally:
+            DatabasePool.return_connection(db)
+    except Exception as e:
+        logger.warning(f"Could not ensure labelsapp history table on startup: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -350,6 +362,41 @@ def _resolve_operador_label(db, username: Optional[str] = None, usuario_id: Opti
     return ""
 
 
+def _normalize_role_key(role: Optional[str]) -> str:
+    return (role or "").strip().lower()
+
+
+def _can_view_all_labelsapp_history(role: Optional[str]) -> bool:
+    return _normalize_role_key(role) in {"administrador", "admin", "manager", "gerente"}
+
+
+def _resolve_requester_role(db, username: Optional[str] = None, usuario_id: Optional[int] = None, role: Optional[str] = None) -> str:
+    if usuario_id is not None and usuario_id in ACTIVE_SESSIONS:
+        return _normalize_role_key(ACTIVE_SESSIONS[usuario_id].get("rol"))
+
+    if username:
+        for session_data in ACTIVE_SESSIONS.values():
+            if _normalize_role_key(session_data.get("username")) == _normalize_role_key(username):
+                return _normalize_role_key(session_data.get("rol"))
+
+    try:
+        cur = db.cursor()
+        if usuario_id is not None:
+            cur.execute("SELECT rol FROM usuarios WHERE id = %s LIMIT 1", (usuario_id,))
+            row = cur.fetchone()
+            if row and row[0]:
+                return _normalize_role_key(str(row[0]))
+        if username:
+            cur.execute("SELECT rol FROM usuarios WHERE LOWER(TRIM(username)) = LOWER(TRIM(%s)) LIMIT 1", (username,))
+            row = cur.fetchone()
+            if row and row[0]:
+                return _normalize_role_key(str(row[0]))
+    except Exception:
+        pass
+
+    return _normalize_role_key(role)
+
+
 def _get_labelsapp_live_queue(db, table_name: str, limit: int = 50):
     cur = db.cursor()
     cur.execute(
@@ -473,6 +520,75 @@ def _ensure_pedidos_table(db, table_name: str) -> None:
     """)
     cur.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_factura ON {table_name}(id_factura)")
     cur.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_estado ON {table_name}(estado)")
+
+
+def _ensure_labelsapp_history_table(db) -> None:
+    cur = db.cursor()
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS labelsapp_historial (
+            id BIGSERIAL PRIMARY KEY,
+            id_factura VARCHAR(120) NOT NULL,
+            id_cliente VARCHAR(120),
+            sucursal VARCHAR(120) NOT NULL,
+            username VARCHAR(120),
+            usuario_id INTEGER,
+            operador VARCHAR(120),
+            prioridad VARCHAR(10) DEFAULT 'Media',
+            total_items INTEGER DEFAULT 0,
+            total_unidades INTEGER DEFAULT 0,
+            productos_json JSONB NOT NULL,
+            estado_envio VARCHAR(20) DEFAULT 'Enviado',
+            origen VARCHAR(20) DEFAULT 'web',
+            fecha_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_labelsapp_historial_fecha ON labelsapp_historial(fecha_envio DESC)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_labelsapp_historial_factura ON labelsapp_historial(id_factura)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_labelsapp_historial_sucursal ON labelsapp_historial(sucursal)")
+
+
+def _store_labelsapp_history(db, payload, sucursal_slug: str, operador_label: Optional[str], estado_envio: str = "Enviado") -> None:
+    _ensure_labelsapp_history_table(db)
+    cur = db.cursor()
+    total_items = len(payload.items or [])
+    total_unidades = sum(max(1, int(item.cantidad or 1)) for item in (payload.items or []))
+    productos_json = json.dumps([item.dict() for item in (payload.items or [])], ensure_ascii=False)
+    cur.execute(
+        """
+        INSERT INTO labelsapp_historial (
+            id_factura,
+            id_cliente,
+            sucursal,
+            username,
+            usuario_id,
+            operador,
+            prioridad,
+            total_items,
+            total_unidades,
+            productos_json,
+            estado_envio,
+            origen,
+            fecha_envio
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s)
+        """,
+        (
+            payload.id_factura,
+            (payload.id_cliente or None),
+            sucursal_slug,
+            payload.username,
+            payload.usuario_id,
+            operador_label,
+            (payload.prioridad or "Media").strip().title(),
+            total_items,
+            total_unidades,
+            productos_json,
+            estado_envio,
+            "web",
+            datetime.now(),
+        )
+    )
 
 
 def _generate_order_id(id_factura: str, codigo: str, idx: int) -> str:
@@ -1338,6 +1454,8 @@ async def labelsapp_send(payload: LabelsAppSendRequest, db=Depends(get_db)):
         except Exception:
             pass
 
+        _store_labelsapp_history(db, payload, sucursal_slug, operador_label, estado_envio="Enviado")
+
         db.commit()
 
         return {
@@ -1565,6 +1683,8 @@ async def labelsapp_factura_replace_items(
             cur.execute(f"NOTIFY pedidos_actualizados, 'labels:editada:{id_factura}'")
         except Exception:
             pass
+
+        _store_labelsapp_history(db, payload, sucursal_slug, None, estado_envio="Actualizada")
         db.commit()
         return {"id_factura": id_factura, "inserted": inserted, "tabla": table_name}
     except HTTPException:
@@ -1576,6 +1696,118 @@ async def labelsapp_factura_replace_items(
             pass
         logger.error(f"Error replacing factura items: {e}")
         raise HTTPException(status_code=500, detail="Error editando factura")
+
+
+@app.get("/api/v1/labelsapp/history")
+async def labelsapp_history(
+    limit: int = 100,
+    date: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    q: Optional[str] = None,
+    factura: Optional[str] = None,
+    cliente: Optional[str] = None,
+    operador: Optional[str] = None,
+    sucursal: Optional[str] = None,
+    username: Optional[str] = None,
+    usuario_id: Optional[int] = None,
+    role: Optional[str] = None,
+    db=Depends(get_db)
+):
+    """Obtener el historial de envíos de LabelsApp por día."""
+    try:
+        _ensure_labelsapp_history_table(db)
+        safe_limit = max(1, min(int(limit or 100), 500))
+        cur = db.cursor()
+        filters = []
+        params = []
+        requester_role = _resolve_requester_role(db, username=username, usuario_id=usuario_id, role=role)
+        can_view_all = _can_view_all_labelsapp_history(requester_role)
+
+        if date:
+            filters.append("fecha_envio::date = %s::date")
+            params.append(date)
+        if date_from:
+            filters.append("fecha_envio::date >= %s::date")
+            params.append(date_from)
+        if date_to:
+            filters.append("fecha_envio::date <= %s::date")
+            params.append(date_to)
+
+        search_terms = [term for term in [q, factura, cliente, operador] if (term or "").strip()]
+        if search_terms:
+            search_term = (search_terms[0] or "").strip()
+            filters.append(
+                "(" \
+                "LOWER(COALESCE(id_factura, '')) LIKE LOWER(%s) OR " \
+                "LOWER(COALESCE(id_cliente, '')) LIKE LOWER(%s) OR " \
+                "LOWER(COALESCE(operador, '')) LIKE LOWER(%s)" \
+                ")"
+            )
+            params.extend([f"%{search_term}%", f"%{search_term}%", f"%{search_term}%"])
+
+        if not can_view_all:
+            requester_sucursal = _resolve_sucursal_slug(db, username=username, usuario_id=usuario_id, sucursal_text=sucursal)
+            filters.append("TRIM(COALESCE(sucursal, '')) = TRIM(COALESCE(%s, ''))")
+            params.append(requester_sucursal)
+
+        where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
+        params.append(safe_limit)
+
+        cur.execute(
+            f"""
+            SELECT
+                id,
+                id_factura,
+                id_cliente,
+                sucursal,
+                username,
+                usuario_id,
+                operador,
+                prioridad,
+                total_items,
+                total_unidades,
+                productos_json,
+                estado_envio,
+                origen,
+                fecha_envio
+            FROM labelsapp_historial
+            {where_clause}
+            ORDER BY fecha_envio DESC, id DESC
+            LIMIT %s
+            """,
+            params,
+        )
+
+        items = []
+        for row in cur.fetchall() or []:
+            productos_raw = row[10] or []
+            if isinstance(productos_raw, str):
+                try:
+                    productos_raw = json.loads(productos_raw)
+                except Exception:
+                    productos_raw = []
+            items.append({
+                "id": row[0],
+                "id_factura": row[1],
+                "id_cliente": row[2],
+                "sucursal": row[3],
+                "username": row[4],
+                "usuario_id": row[5],
+                "operador": row[6],
+                "prioridad": row[7],
+                "total_items": int(row[8] or 0),
+                "total_unidades": int(row[9] or 0),
+                "productos": productos_raw,
+                "estado_envio": row[11],
+                "origen": row[12],
+                "fecha_envio": row[13].isoformat() if row[13] else None,
+            })
+
+        return {"items": items, "total": len(items)}
+    except Exception as e:
+        logger.error(f"Error getting labelsapp history: {e}")
+        raise HTTPException(status_code=500, detail="Error obteniendo historial de LabelsApp")
 
 
 # ============================================================
