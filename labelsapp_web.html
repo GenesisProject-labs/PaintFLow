@@ -759,6 +759,7 @@
                 <button class="labelsapp-subtab-btn active" type="button" data-labelsapp-tab="queue" onclick="switchLabelsAppTab(event, 'queue')">Cola actual</button>
                 <button class="labelsapp-subtab-btn" type="button" data-labelsapp-tab="hold" onclick="switchLabelsAppTab(event, 'hold')">En espera</button>
                 <button class="labelsapp-subtab-btn" type="button" data-labelsapp-tab="live" onclick="switchLabelsAppTab(event, 'live')">Tiempo real</button>
+                <button class="labelsapp-subtab-btn" type="button" data-labelsapp-tab="history" onclick="switchLabelsAppTab(event, 'history')">Historial</button>
             </div>
 
             <div id="labelsappQueueTab" class="labelsapp-subtab-content active">
@@ -776,6 +777,14 @@
                                 <option>Baja</option>
                             </select>
                         </div>
+                    </div>
+
+                    <div class="row-2" style="margin-bottom: 10px;">
+                        <div>
+                            <label for="idCliente">ID Cliente</label>
+                            <input id="idCliente" placeholder="Ej: CL-458" />
+                        </div>
+                        <div></div>
                     </div>
 
                     <div id="summary" class="summary">0 item(s) en cola</div>
@@ -860,6 +869,50 @@
                     </div>
                 </div>
             </div>
+
+            <div id="labelsappHistoryTab" class="labelsapp-subtab-content">
+                <div class="card-body queue-tab-shell">
+                    <div class="summary">Busca por cliente, factura u operador y filtra por fechas sin salir de la subventana.</div>
+                    <div class="row-2" style="margin-bottom: 10px;">
+                        <div>
+                            <label for="historySearch">Busqueda</label>
+                            <input id="historySearch" placeholder="Cliente, factura u operador" />
+                        </div>
+                        <div></div>
+                    </div>
+                    <div class="row-2" style="margin-bottom: 10px;">
+                        <div>
+                            <label for="historyDateFrom">Desde</label>
+                            <input id="historyDateFrom" type="date" />
+                        </div>
+                        <div>
+                            <label for="historyDateTo">Hasta</label>
+                            <input id="historyDateTo" type="date" />
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 8px;">
+                        <button class="btn btn-primary" type="button" onclick="refreshHistory()">Buscar</button>
+                        <button class="btn btn-link" type="button" onclick="clearHistoryFilters()">Limpiar filtros</button>
+                    </div>
+                    <div id="historySummary" class="summary">0 envíos hoy</div>
+                </div>
+                <div class="queue-wrap live-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Factura</th>
+                                <th>Items</th>
+                                <th>ID Cliente</th>
+                                <th>Sucursal</th>
+                                <th>Operador</th>
+                                <th>Enviado</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyBody"></tbody>
+                    </table>
+                </div>
+            </div>
         </section>
     </main>
 
@@ -909,6 +962,8 @@
         const liveQueue = [];
         const customProducts = [];
         const heldLists = [];
+        let historyEntries = [];
+        let historyLoading = false;
         let codeSuggestions = [];
         let activeSuggestionIndex = -1;
         let descriptionSuggestions = [];
@@ -1232,6 +1287,86 @@
         function forcedCodeForProductName(name) {
             const canon = canonicalProductName(name);
             return PRODUCT_FORCED_CODE_BY_CANON[canon] || "";
+        }
+
+        async function refreshHistory() {
+            if (historyLoading) return;
+            historyLoading = true;
+            try {
+                const params = new URLSearchParams({ limit: "100" });
+                const user = ensureSession();
+                if (user?.username) params.set("username", user.username);
+                if (user?.id) params.set("usuario_id", String(user.id));
+                if (user?.rol) params.set("role", user.rol);
+                if (user?.rol && ["administrador", "admin", "manager", "gerente"].includes(String(user.rol).toLowerCase())) {
+                    params.delete("sucursal");
+                } else if (user?.sucursal || user?.sucursal_nombre) {
+                    params.set("sucursal", user.sucursal || user.sucursal_nombre);
+                }
+                const searchText = document.getElementById("historySearch")?.value.trim() || "";
+                const dateFrom = document.getElementById("historyDateFrom")?.value || "";
+                const dateTo = document.getElementById("historyDateTo")?.value || "";
+                if (searchText) params.set("q", searchText);
+                if (dateFrom) params.set("date_from", dateFrom);
+                if (dateTo) params.set("date_to", dateTo);
+                const res = await fetch(`${API}/api/v1/labelsapp/history?${params.toString()}`);
+                if (!res.ok) throw new Error("No se pudo cargar el historial");
+                const data = await res.json();
+                historyEntries = Array.isArray(data.items) ? data.items : [];
+                renderHistory();
+            } catch {
+                historyEntries = [];
+                renderHistory();
+            } finally {
+                historyLoading = false;
+            }
+        }
+
+        function getHistoryEntryById(id) {
+            return historyEntries.find((entry) => String(entry.id) === String(id));
+        }
+
+        function loadHistoryEntry(id, skipConfirm = false) {
+            const entry = getHistoryEntryById(id);
+            if (!entry) return;
+            if (!skipConfirm && queue.length && !confirm("La cola actual se va a reemplazar con este envío del historial. ¿Continuar?")) {
+                return;
+            }
+
+            editingFacturaId = null;
+            queue.length = 0;
+            for (const item of (entry.productos || entry.items || [])) {
+                queue.push({ ...item });
+            }
+            document.getElementById("idFactura").value = entry.factura || "";
+            document.getElementById("prioridad").value = entry.prioridad || "Media";
+            document.getElementById("idCliente").value = entry.id_cliente || "";
+            renderQueue();
+            switchLabelsAppTab(null, "queue");
+            setStatus("Historial cargado en la cola", "ok");
+        }
+
+        async function resendHistoryEntry(id) {
+            const entry = getHistoryEntryById(id);
+            if (!entry) return;
+            if (queue.length && !confirm("La cola actual se va a reemplazar y se reenviará este lote. ¿Continuar?")) {
+                return;
+            }
+
+            loadHistoryEntry(id, true);
+            if (!queue.length) return;
+            await sendQueue();
+        }
+
+        function formatCodigoBaseForItem(item) {
+            const producto = item?.producto || "";
+            const presentacion = item?.presentacion || "";
+            const forcedBase = forcedCodeForProductName(producto);
+            if (forcedBase) {
+                const suffix = getSuffixByPresentacion(presentacion);
+                return suffix ? `${forcedBase}${suffix}` : forcedBase;
+            }
+            return (item?.codigo_base || "").toString().trim();
         }
 
         function getProductUsageScore(name) {
@@ -2054,7 +2189,8 @@
 
             const forcedByProduct = forcedCodeForProductName(producto);
             if (forcedByProduct) {
-                document.getElementById("codigoBase").value = forcedByProduct;
+                const suffix = getSuffixByPresentacion(presentacion);
+                document.getElementById("codigoBase").value = suffix ? `${forcedByProduct}${suffix}` : forcedByProduct;
                 return;
             }
 
@@ -2136,7 +2272,7 @@
             document.getElementById("terminacion").value = item.terminacion || "";
             document.getElementById("presentacion").value = item.presentacion || "";
             document.getElementById("cantidad").value = item.cantidad || 1;
-            document.getElementById("codigoBase").value = item.codigo_base || "";
+            document.getElementById("codigoBase").value = formatCodigoBaseForItem(item);
             const btn = document.querySelector("button[onclick='addToQueue()']");
             if (btn) btn.textContent = "Actualizar Producto";
             switchProductTab(null, "capture");
@@ -2293,7 +2429,7 @@
                         <td>${item.presentacion || "-"}</td>
                         <td ondblclick="editQueueItem(${idx})">${item.cantidad}</td>
                         <td>${item.base || "-"}</td>
-                        <td>${item.codigo_base || "-"}</td>
+                        <td>${formatCodigoBaseForItem(item) || "-"}</td>
                         <td><button class="btn btn-danger" onclick="removeQueueItem(${idx})">Quitar</button></td>
                     </tr>
                 `).join("");
@@ -2336,6 +2472,50 @@
                     </td>
                 </tr>
             `).join("");
+        }
+
+        function renderHistory() {
+            const body = document.getElementById("historyBody");
+            const summary = document.getElementById("historySummary");
+            const entries = historyEntries || [];
+
+            if (summary) {
+                const totalItems = entries.reduce((acc, entry) => acc + Number(entry.total_unidades || entry.inserted || (entry.productos || entry.items || []).length || 0), 0);
+                summary.textContent = `${entries.length} envío(s) · ${totalItems} item(s)`;
+            }
+
+            if (!body) return;
+            if (!entries.length) {
+                body.innerHTML = `<tr><td colspan="7" class="empty">No hay envíos que coincidan con los filtros</td></tr>`;
+                return;
+            }
+
+            body.innerHTML = entries.map((entry) => `
+                <tr>
+                    <td>${escapeHtml(entry.id_factura || entry.factura || "-")}</td>
+                    <td>${Number(entry.total_items || entry.inserted || (entry.productos || entry.items || []).length || 0)}</td>
+                    <td>${escapeHtml(entry.id_cliente || "-")}</td>
+                    <td>${escapeHtml(entry.sucursal || "-")}</td>
+                    <td>${escapeHtml(entry.operador || "-")}</td>
+                    <td>${escapeHtml(new Date(entry.fecha_envio || entry.sentAt || Date.now()).toLocaleString())}</td>
+                    <td>
+                        <button class="btn btn-link" onclick="loadHistoryEntry('${entry.id}')">Cargar</button>
+                        <button class="btn btn-primary" onclick="resendHistoryEntry('${entry.id}')">Reenviar</button>
+                    </td>
+                </tr>
+            `).join("");
+        }
+
+        function clearHistoryFilters() {
+            const searchEl = document.getElementById("historySearch");
+            const fromEl = document.getElementById("historyDateFrom");
+            const toEl = document.getElementById("historyDateTo");
+            const today = new Date();
+            const dateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+            if (searchEl) searchEl.value = "";
+            if (fromEl) fromEl.value = dateKey;
+            if (toEl) toEl.value = dateKey;
+            refreshHistory();
         }
 
         async function updateLivePriority(factura, prioridad) {
@@ -2402,7 +2582,7 @@
                         cantidad: item.cantidad || 1,
                         base: item.base || "",
                         ubicacion: item.ubicacion || "",
-                        codigo_base: item.codigo_base || "",
+                        codigo_base: formatCodigoBaseForItem(item),
                         prioridad: item.prioridad || "Media"
                     });
                 }
@@ -2431,7 +2611,7 @@
         }
 
         function switchLabelsAppTab(evt, tabName) {
-            labelsAppTab = ["queue", "hold", "live"].includes(tabName) ? tabName : "queue";
+            labelsAppTab = ["queue", "hold", "live", "history"].includes(tabName) ? tabName : "queue";
 
             document.querySelectorAll("[data-labelsapp-tab]").forEach((btn) => {
                 btn.classList.toggle("active", btn.getAttribute("data-labelsapp-tab") === labelsAppTab);
@@ -2440,13 +2620,18 @@
             const queueTab = document.getElementById("labelsappQueueTab");
             const holdTab = document.getElementById("labelsappHoldTab");
             const liveTab = document.getElementById("labelsappLiveTab");
+            const historyTab = document.getElementById("labelsappHistoryTab");
             if (queueTab) queueTab.classList.toggle("active", labelsAppTab === "queue");
             if (holdTab) holdTab.classList.toggle("active", labelsAppTab === "hold");
             if (liveTab) liveTab.classList.toggle("active", labelsAppTab === "live");
+            if (historyTab) historyTab.classList.toggle("active", labelsAppTab === "history");
 
             setLivePolling(labelsAppTab === "live");
             if (labelsAppTab === "live") {
                 loadLiveQueue();
+            }
+            if (labelsAppTab === "history") {
+                renderHistory();
             }
 
             if (evt && evt.preventDefault) {
@@ -2500,6 +2685,7 @@
             try {
                 const payload = {
                     id_factura,
+                    id_cliente: document.getElementById("idCliente").value.trim(),
                     prioridad,
                     username: user.username,
                     usuario_id: user.id,
@@ -2539,6 +2725,7 @@
                 if (labelsAppTab === "live") {
                     await loadLiveQueue();
                 }
+                await refreshHistory();
             } catch (err) {
                 setStatus(err.message || "Error enviando lote", "error");
             }
@@ -2764,6 +2951,7 @@
             setSelectOptions("presentacion", DEFAULT_PRESENTACIONES);
             renderQueue();
             renderHeldLists();
+            clearHistoryFilters();
             switchLabelsAppTab(null, "queue");
             switchProductTab(null, "capture");
             if (hasSeenWorkflow()) {

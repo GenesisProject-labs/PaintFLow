@@ -1584,6 +1584,9 @@ def obtener_sufijo_presentacion(presentacion, producto=None, base=None):
     prod = (producto or "").strip().lower()
     b = (base or "").strip().lower()
 
+    if 'texturizado' in prod:
+        return '5' if pr == 'Cubeta' else ''
+
     # Resolver sufijo base por presentación
     suf_base = ""
     if pr == "Cuarto":
@@ -4077,6 +4080,28 @@ def es_producto_texturizado(producto):
         'exc. texdturizado', 'exc texdturizado'
     ])
 
+def calcular_codigo_base_completo(base, producto, terminacion, presentacion):
+    """Calcula el código base final incluyendo el sufijo de presentación.
+
+    Texturizado se trata como caso especial: no exige terminación y solo
+    agrega sufijo cuando la presentación es Cubeta.
+    """
+    base_sel = (base or '').strip()
+    producto_sel = (producto or '').strip()
+    terminacion_sel = (terminacion or '').strip()
+    presentacion_sel = (presentacion or '').strip()
+
+    requiere_terminacion = not es_producto_texturizado(producto_sel)
+    if not base_sel or not producto_sel or (requiere_terminacion and not terminacion_sel):
+        return ''
+
+    codigo_base = obtener_codigo_base(base_sel, producto_sel, terminacion_sel or '')
+    if codigo_base in ('No encontrado', 'No Aplica', 'Error', None, ''):
+        return ''
+
+    sufijo = obtener_sufijo_presentacion(presentacion_sel, producto_sel, base_sel)
+    return f"{codigo_base}{sufijo}" if sufijo else codigo_base
+
 # Sugerencia dinámica de Código Base (sin copiar al portapapeles)
 def actualizar_codigo_base_sugerido(*args):
     try:
@@ -4085,23 +4110,7 @@ def actualizar_codigo_base_sugerido(*args):
         terminacion = (terminacion_var.get() or '').strip()
         presentacion = (presentacion_var.get() or '').strip()
 
-        # Requisitos mínimos
-        requiere_terminacion = not es_producto_texturizado(producto)
-        if not base or not producto or (requiere_terminacion and not terminacion):
-            codigo_base_var.set("")
-            return
-
-        resultado = obtener_codigo_base(base, producto, terminacion or "")
-        if not resultado or resultado in ("No encontrado", "No Aplica", "Error"):
-            codigo_base_var.set("")
-            return
-
-        if presentacion:
-            suf = obtener_sufijo_presentacion(presentacion, producto, base)
-            if suf:
-                resultado = f"{resultado}{suf}"
-
-        codigo_base_var.set(resultado)
+        codigo_base_var.set(calcular_codigo_base_completo(base, producto, terminacion, presentacion))
     except Exception:
         # En caso de error no bloquear la UI
         codigo_base_var.set("")
@@ -4354,18 +4363,8 @@ def recalcular_codigo_base(event=None):
         p = producto_var.get().strip()
         t = terminacion_var.get().strip()
         pr = presentacion_var.get().strip()
-        
-        codigo_base_calc = ""
-        if base_sel and p and t:
-            codigo_base_calc = obtener_codigo_base(base_sel, p, t)
-            if codigo_base_calc not in ("No encontrado", "No Aplica", "Error", None, ""):
-                suf = obtener_sufijo_presentacion(pr, p, base_sel)
-                if suf:
-                    codigo_base_calc = f"{codigo_base_calc}{suf}"
-            else:
-                codigo_base_calc = ""
-        
-        codigo_base_var.set(codigo_base_calc)
+
+        codigo_base_var.set(calcular_codigo_base_completo(base_sel, p, t, pr))
     except Exception as e:
         debug_log(f"Error recalculando código base: {e}")
 
@@ -6303,16 +6302,7 @@ def agregar_producto_a_lista():
     # Calcular y guardar código base en el momento de agregar
     try:
         base_sel = producto_item.get('base')
-        codigo_base_calc = ""
-        if base_sel and p and t:
-            codigo_base_calc = obtener_codigo_base(base_sel, p, t)
-            if codigo_base_calc not in ("No encontrado", "No Aplica", "Error", None, ""):
-                suf = obtener_sufijo_presentacion(pr, p, base_sel)
-                if suf:
-                    codigo_base_calc = f"{codigo_base_calc}{suf}"
-            else:
-                codigo_base_calc = ""
-        producto_item['codigo_base'] = codigo_base_calc
+        producto_item['codigo_base'] = calcular_codigo_base_completo(base_sel, p, t, pr)
     except Exception:
         producto_item['codigo_base'] = ""
     
@@ -6522,7 +6512,7 @@ def abrir_gestor_lista_factura():
                 desc = _descripcion_pt(p.get('producto'), p.get('terminacion'))
                 color = p.get('codigo')
                 cant = p.get('cantidad')
-                cb = p.get('codigo_base') or ""
+                cb = p.get('codigo_base') or _codigo_base_producto(p)
                 tree_productos.insert("", "end", iid=str(idx), values=(cb, desc, color, cant))
             except Exception:
                 tree_productos.insert("", "end", iid=str(idx), values=("", _descripcion_pt(p.get('producto'), p.get('terminacion')), p.get('codigo'), p.get('cantidad')))
@@ -6732,15 +6722,7 @@ def abrir_gestor_lista_factura():
                 try:
                     base_sel = datos.get('base')
                     pres_sel = datos.get('presentacion')
-                    cb = ""
-                    if base_sel and producto_n and terminacion_n:
-                        cb_raw = obtener_codigo_base(base_sel, producto_n, terminacion_n)
-                        if cb_raw not in ("No encontrado", "No Aplica", "Error", None, ""):
-                            suf = obtener_sufijo_presentacion(pres_sel, producto_n, base_sel)
-                            if suf:
-                                cb_raw = f"{cb_raw}{suf}"
-                            cb = cb_raw
-                    datos['codigo_base'] = cb
+                    datos['codigo_base'] = calcular_codigo_base_completo(base_sel, producto_n, terminacion_n, pres_sel)
                 except Exception:
                     pass
                 cargar_productos_en_tree()
