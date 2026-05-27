@@ -36,9 +36,11 @@ class ConnectionPool:
     _lock = threading.Lock()
 
     def __init__(self) -> None:
-        self.pool = psycopg2.pool.SimpleConnectionPool(
-            minconn=1,
-            maxconn=10,
+        min_conn = max(1, int(settings.DB_POOL_MIN))
+        max_conn = max(min_conn, int(settings.DB_POOL_MAX))
+        self.pool = psycopg2.pool.ThreadedConnectionPool(
+            minconn=min_conn,
+            maxconn=max_conn,
             **DB_CONFIG,
         )
 
@@ -67,4 +69,10 @@ def db_connection() -> Generator[psycopg2.extensions.connection, None, None]:
         conn.rollback()
         raise
     finally:
-        get_db_pool().pool.putconn(conn)
+        try:
+            get_db_pool().pool.putconn(conn, close=getattr(conn, "closed", 1) != 0)
+        except Exception:
+            try:
+                conn.close()
+            except Exception:
+                pass

@@ -15,6 +15,11 @@ class Settings(BaseModel):
     DB_NAME: str = os.getenv('DB_NAME', 'labels_app_db')
     DB_USER: str = os.getenv('DB_USER', 'admin')
     DB_PASSWORD: str = os.getenv('DB_PASSWORD', 'KCFjzM4KYzSQx63ArufESIXq03EFXHz3')
+    DB_POOL_MIN: int = int(os.getenv('DB_POOL_MIN', 1))
+    DB_POOL_MAX: int = int(os.getenv('DB_POOL_MAX', 20))
+    DB_POOL_GET_RETRIES: int = int(os.getenv('DB_POOL_GET_RETRIES', 3))
+    DB_POOL_GET_BACKOFF_SEC: float = float(os.getenv('DB_POOL_GET_BACKOFF_SEC', 0.25))
+    DB_CONNECT_TIMEOUT: int = int(os.getenv('DB_CONNECT_TIMEOUT', 5))
     
     # Frontend Configuration
     FRONTEND_URL: str = os.getenv('FRONTEND_URL', 'http://127.0.0.1:8001')
