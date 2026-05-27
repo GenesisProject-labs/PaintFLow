@@ -33,7 +33,7 @@ class DatabasePool:
                     return
 
                 min_conn = max(1, int(settings.DB_POOL_MIN))
-                max_conn = max(min_conn, int(settings.DB_POOL_MAX))
+                max_conn = max(min_conn, int(settings.DB_POOL_MAX), 200)
 
                 cls._pool = psycopg2.pool.ThreadedConnectionPool(
                     min_conn,
