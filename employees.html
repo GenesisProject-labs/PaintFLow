@@ -1914,6 +1914,20 @@
             return `${dt.toLocaleDateString('es-DO')} ${dt.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })}`;
         }
 
+        function formatTopProductoSafe(topProducto) {
+            if (!topProducto) return '-';
+            if (typeof topProducto === 'string') return topProducto.trim() || '-';
+
+            const producto = String(topProducto.producto || topProducto.nombre || '').trim();
+            const cantidad = Number(topProducto.cantidad || topProducto.qty || 0);
+
+            if (!producto) return '-';
+            if (Number.isFinite(cantidad) && cantidad > 0) {
+                return `${producto} (${cantidad})`;
+            }
+            return producto;
+        }
+
         function renderAnalystSucursalLoginByZoneTable(data, selectedZona) {
             const loginBody = document.getElementById('labelsSucursalLoginByZoneBody');
             if (!loginBody) return;
@@ -1936,7 +1950,7 @@
                         sucursal: s.sucursal || 'N/A',
                         login: formatDateTimeSafe(s.ultimo_login),
                         user: s.ultimo_login_username || '-',
-                        topProducto: s.top_producto || '-'
+                        topProducto: formatTopProductoSafe(s.top_producto)
                     });
                 });
             });
