@@ -1623,7 +1623,8 @@
 
         async function refreshCustomProducts() {
             try {
-                const res = await fetch(`${API}/api/v1/labelsapp/personalizados`);
+                const params = buildLabelsUserParams();
+                const res = await fetch(`${API}/api/v1/labelsapp/personalizados?${params.toString()}`);
                 if (!res.ok) throw new Error("No se pudieron cargar personalizados");
                 const data = await res.json();
                 customProducts.length = 0;
@@ -1673,7 +1674,8 @@
                 return;
             }
             try {
-                const res = await fetch(`${API}/api/v1/labelsapp/personalizados`, {
+                const params = buildLabelsUserParams();
+                const res = await fetch(`${API}/api/v1/labelsapp/personalizados?${params.toString()}`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ codigo, nombre })
@@ -1693,7 +1695,8 @@
             const code = (codigo || "").toString();
             if (!code) return;
             try {
-                const res = await fetch(`${API}/api/v1/labelsapp/personalizados/${encodeURIComponent(code)}`, { method: "DELETE" });
+                const params = buildLabelsUserParams();
+                const res = await fetch(`${API}/api/v1/labelsapp/personalizados/${encodeURIComponent(code)}?${params.toString()}`, { method: "DELETE" });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || "No se pudo eliminar personalizado");
                 setStatus("Producto personalizado eliminado", "warn");
@@ -1749,6 +1752,18 @@
                 window.location.href = "/";
                 return null;
             }
+        }
+
+        function buildLabelsUserParams() {
+            const params = new URLSearchParams();
+            const user = ensureSession();
+            if (!user) return params;
+            if (user.username) params.set("username", String(user.username));
+            if (user.id) params.set("usuario_id", String(user.id));
+            if (user.sucursal || user.sucursal_nombre) {
+                params.set("sucursal", String(user.sucursal || user.sucursal_nombre));
+            }
+            return params;
         }
 
         function initialsFromName(name) {
@@ -1972,7 +1987,9 @@
         async function reloadProducts() {
             setStatus("Cargando productos...", "warn");
             try {
-                const res = await fetch(`${API}/api/v1/labelsapp/products?limit=0`);
+                const params = buildLabelsUserParams();
+                params.set("limit", "0");
+                const res = await fetch(`${API}/api/v1/labelsapp/products?${params.toString()}`);
                 if (!res.ok) throw new Error("No se pudieron cargar productos");
                 const data = await res.json();
 
@@ -2234,7 +2251,10 @@
 
         async function enrichSuggestionsFromApi(query) {
             try {
-                const res = await fetch(`${API}/api/v1/labelsapp/products?q=${encodeURIComponent(query)}&limit=120`);
+                const params = buildLabelsUserParams();
+                params.set("q", query);
+                params.set("limit", "120");
+                const res = await fetch(`${API}/api/v1/labelsapp/products?${params.toString()}`);
                 if (!res.ok) return;
 
                 const data = await res.json();
@@ -2360,7 +2380,8 @@
                 }
             }
             if (!product) {
-                const res = await fetch(`${API}/api/v1/labelsapp/product/${encodeURIComponent(codigo)}`);
+                const params = buildLabelsUserParams();
+                const res = await fetch(`${API}/api/v1/labelsapp/product/${encodeURIComponent(codigo)}?${params.toString()}`);
                 if (res.ok) {
                     product = await res.json();
                     productByCode.set(product.codigo, product);

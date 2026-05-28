@@ -281,6 +281,7 @@ def _load_personalized_products() -> List[dict]:
                     "base": row.get("base", "") or "",
                     "ubicacion": row.get("ubicacion", "") or "",
                     "fecha_creacion": row.get("fecha_creacion", "") or "",
+                    "sucursal_slug": (row.get("sucursal_slug") or "").strip(),
                     "personalizado": True,
                 })
     except Exception as e:
@@ -289,7 +290,7 @@ def _load_personalized_products() -> List[dict]:
 
 
 def _save_personalized_products(items: List[dict]) -> None:
-    fieldnames = ["codigo", "nombre", "base", "ubicacion", "fecha_creacion"]
+    fieldnames = ["codigo", "nombre", "base", "ubicacion", "fecha_creacion", "sucursal_slug"]
     os.makedirs(os.path.dirname(PERSONALIZADOS_CSV_PATH), exist_ok=True)
     with open(PERSONALIZADOS_CSV_PATH, "w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -301,7 +302,16 @@ def _save_personalized_products(items: List[dict]) -> None:
                 "base": (item.get("base") or "").strip(),
                 "ubicacion": (item.get("ubicacion") or "").strip(),
                 "fecha_creacion": (item.get("fecha_creacion") or "").strip(),
+                "sucursal_slug": (item.get("sucursal_slug") or "").strip(),
             })
+
+
+def _filter_personalized_products_by_sucursal(items: List[dict], sucursal_slug: str) -> List[dict]:
+    slug = (sucursal_slug or "principal").strip() or "principal"
+    return [
+        item for item in (items or [])
+        if (item.get("sucursal_slug") or "").strip() == slug
+    ]
 
 
 def _find_personalized_product_by_code(codigo: str) -> Optional[dict]:
@@ -1217,7 +1227,14 @@ def _calculate_codigo_base(db, base: str, producto: str, terminacion: str) -> st
 
 
 @app.get("/api/v1/labelsapp/products")
-async def labelsapp_products(q: str = "", limit: int = 250, db=Depends(get_db)):
+async def labelsapp_products(
+    q: str = "",
+    limit: int = 250,
+    username: Optional[str] = None,
+    usuario_id: Optional[int] = None,
+    sucursal: Optional[str] = None,
+    db=Depends(get_db)
+):
     """Buscar productos para LabelsApp Web"""
     try:
         safe_limit = None if limit <= 0 else max(1, min(limit, 50000))
@@ -1263,7 +1280,16 @@ async def labelsapp_products(q: str = "", limit: int = 250, db=Depends(get_db)):
             for r in rows
         ]
 
-        personalized = _load_personalized_products()
+        requester_sucursal_slug = _resolve_sucursal_slug(
+            db,
+            username=username,
+            usuario_id=usuario_id,
+            sucursal_text=sucursal,
+        )
+        personalized = _filter_personalized_products_by_sucursal(
+            _load_personalized_products(),
+            requester_sucursal_slug,
+        )
         existing = {str(p.get("codigo") or "").strip().lower() for p in products}
         for item in personalized:
             code = (item.get("codigo") or "").strip()
@@ -1293,7 +1319,13 @@ async def labelsapp_products(q: str = "", limit: int = 250, db=Depends(get_db)):
 
 
 @app.get("/api/v1/labelsapp/product/{codigo}")
-async def labelsapp_product_by_code(codigo: str, db=Depends(get_db)):
+async def labelsapp_product_by_code(
+    codigo: str,
+    username: Optional[str] = None,
+    usuario_id: Optional[int] = None,
+    sucursal: Optional[str] = None,
+    db=Depends(get_db)
+):
     """Obtener producto por código para autocompletar formulario"""
     try:
         cur = db.cursor()
@@ -1308,7 +1340,22 @@ async def labelsapp_product_by_code(codigo: str, db=Depends(get_db)):
         )
         row = cur.fetchone()
         if not row:
-            personalized = _find_personalized_product_by_code(codigo)
+            requester_sucursal_slug = _resolve_sucursal_slug(
+                db,
+                username=username,
+                usuario_id=usuario_id,
+                sucursal_text=sucursal,
+            )
+            personalized = next(
+                (
+                    item for item in _filter_personalized_products_by_sucursal(
+                        _load_personalized_products(),
+                        requester_sucursal_slug,
+                    )
+                    if (item.get("codigo") or "").strip().lower() == (codigo or "").strip().lower()
+                ),
+                None,
+            )
             if personalized:
                 return personalized
             raise HTTPException(status_code=404, detail="Producto no encontrado")
@@ -1326,12 +1373,30 @@ async def labelsapp_product_by_code(codigo: str, db=Depends(get_db)):
 
 
 @app.get("/api/v1/labelsapp/personalizados")
-async def labelsapp_personalized_products():
-    return {"items": _load_personalized_products()}
+async def labelsapp_personalized_products(
+    username: Optional[str] = None,
+    usuario_id: Optional[int] = None,
+    sucursal: Optional[str] = None,
+    db=Depends(get_db)
+):
+    requester_sucursal_slug = _resolve_sucursal_slug(
+        db,
+        username=username,
+        usuario_id=usuario_id,
+        sucursal_text=sucursal,
+    )
+    items = _filter_personalized_products_by_sucursal(_load_personalized_products(), requester_sucursal_slug)
+    return {"items": items}
 
 
 @app.post("/api/v1/labelsapp/personalizados")
-async def labelsapp_create_personalized_product(payload: LabelsAppPersonalizedProductRequest):
+async def labelsapp_create_personalized_product(
+    payload: LabelsAppPersonalizedProductRequest,
+    username: Optional[str] = None,
+    usuario_id: Optional[int] = None,
+    sucursal: Optional[str] = None,
+    db=Depends(get_db)
+):
     codigo = (payload.codigo or "").strip()
     nombre = (payload.nombre or "").strip()
     if not codigo or not nombre:
@@ -1349,8 +1414,16 @@ async def labelsapp_create_personalized_product(payload: LabelsAppPersonalizedPr
             detail=f"La descripción no puede exceder {PERSONALIZADO_NOMBRE_MAX} caracteres",
         )
 
+    requester_sucursal_slug = _resolve_sucursal_slug(
+        db,
+        username=username,
+        usuario_id=usuario_id,
+        sucursal_text=sucursal,
+    )
+
     items = _load_personalized_products()
-    if any((item.get("codigo") or "").strip().lower() == codigo.lower() for item in items):
+    scoped_items = _filter_personalized_products_by_sucursal(items, requester_sucursal_slug)
+    if any((item.get("codigo") or "").strip().lower() == codigo.lower() for item in scoped_items):
         raise HTTPException(status_code=409, detail="El código ya existe en productos personalizados")
 
     items.append({
@@ -1359,15 +1432,36 @@ async def labelsapp_create_personalized_product(payload: LabelsAppPersonalizedPr
         "base": "",
         "ubicacion": "",
         "fecha_creacion": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "sucursal_slug": requester_sucursal_slug,
     })
     _save_personalized_products(items)
     return {"message": "Producto personalizado guardado", "codigo": codigo, "nombre": nombre}
 
 
 @app.delete("/api/v1/labelsapp/personalizados/{codigo}")
-async def labelsapp_delete_personalized_product(codigo: str):
+async def labelsapp_delete_personalized_product(
+    codigo: str,
+    username: Optional[str] = None,
+    usuario_id: Optional[int] = None,
+    sucursal: Optional[str] = None,
+    db=Depends(get_db)
+):
+    requester_sucursal_slug = _resolve_sucursal_slug(
+        db,
+        username=username,
+        usuario_id=usuario_id,
+        sucursal_text=sucursal,
+    )
+
     items = _load_personalized_products()
-    filtered = [item for item in items if (item.get("codigo") or "").strip().lower() != (codigo or "").strip().lower()]
+    code_norm = (codigo or "").strip().lower()
+    filtered = [
+        item for item in items
+        if not (
+            (item.get("codigo") or "").strip().lower() == code_norm
+            and (item.get("sucursal_slug") or "").strip() == requester_sucursal_slug
+        )
+    ]
     if len(filtered) == len(items):
         raise HTTPException(status_code=404, detail="Código no encontrado en productos personalizados")
     _save_personalized_products(filtered)
