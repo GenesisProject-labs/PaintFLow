@@ -570,6 +570,50 @@
             font-weight: 600;
         }
 
+        .labelsapp-queue-table td {
+            vertical-align: middle;
+        }
+
+        .labelsapp-queue-table th:nth-child(n+4),
+        .labelsapp-queue-table td:nth-child(n+4) {
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        .labelsapp-queue-table th:nth-child(-n+3),
+        .labelsapp-queue-table td:nth-child(-n+3) {
+            text-align: left;
+        }
+
+        .labelsapp-queue-table td:nth-child(4),
+        .labelsapp-queue-table td:nth-child(5),
+        .labelsapp-queue-table td:nth-child(9) {
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+
+        .queue-cell-content,
+        .queue-cell-control,
+        .queue-cell-action {
+            min-height: 38px;
+            display: flex;
+            align-items: center;
+        }
+
+        .queue-cell-content {
+            justify-content: flex-start;
+        }
+
+        .labelsapp-queue-table td:nth-child(n+4) .queue-cell-content,
+        .queue-cell-control,
+        .queue-cell-action {
+            justify-content: center;
+        }
+
+        .queue-cell-action .btn {
+            margin: 0;
+        }
+
         .labelsapp-live-table th:nth-child(n+2),
         .labelsapp-live-table td:nth-child(n+2) {
             text-align: center;
@@ -579,6 +623,7 @@
         .labelsapp-live-table th:nth-child(1),
         .labelsapp-live-table td:nth-child(1) {
             text-align: left;
+            vertical-align: middle;
         }
 
         .labelsapp-history-table th:nth-child(7),
@@ -596,6 +641,7 @@
         .labelsapp-history-table th:nth-child(1),
         .labelsapp-history-table td:nth-child(1) {
             text-align: left;
+            vertical-align: middle;
         }
 
         .labelsapp-live-table,
@@ -667,6 +713,15 @@
 
         .table-action-group .btn {
             min-width: 96px;
+        }
+
+        .queue-inline-select {
+            min-height: 34px;
+            padding: 6px 8px;
+            border-radius: 8px;
+            max-width: 150px;
+            margin: 0 auto;
+            display: block;
         }
 
         .footer-bar {
@@ -837,7 +892,7 @@
                     </div>
                 </div>
                 <div class="queue-wrap" style="max-height: 360px;">
-                    <table>
+                    <table class="labelsapp-queue-table">
                         <thead>
                             <tr>
                                 <th>Codigo</th>
@@ -876,14 +931,6 @@
                                 <option>Baja</option>
                             </select>
                         </div>
-                    </div>
-
-                    <div class="row-2" style="margin-bottom: 10px;">
-                        <div>
-                            <label for="idCliente">ID Cliente</label>
-                            <input id="idCliente" placeholder="Ej: CL-458" />
-                        </div>
-                        <div></div>
                     </div>
 
                     <div id="summary" class="summary">0 item(s) en cola</div>
@@ -1095,6 +1142,8 @@
         let productTab = "capture";
         let editingQueueIndex = -1;
         let editingFacturaId = null;
+        let currentCodigoBaseRaw = "";
+        let codigoBaseRequestSeq = 0;
 
         const DEFAULT_TERMINACIONES = ["Mate", "Satin", "Semigloss", "Semimate", "Gloss", "Brillo", "N/A"];
         const DEFAULT_PRESENTACIONES = ["1/8", "Cuarto", "Medio Galon", "Galon", "Cubeta"];
@@ -1458,7 +1507,6 @@
             }
             document.getElementById("idFactura").value = entry.factura || "";
             document.getElementById("prioridad").value = entry.prioridad || "Media";
-            document.getElementById("idCliente").value = entry.id_cliente || "";
             renderQueue();
             switchLabelsAppTab(null, "queue");
             setStatus("Historial cargado en la cola", "ok");
@@ -1484,7 +1532,38 @@
                 const suffix = getSuffixByPresentacion(presentacion);
                 return suffix ? `${forcedBase}${suffix}` : forcedBase;
             }
-            return (item?.codigo_base || "").toString().trim();
+            const raw = (item?.codigo_base_raw || item?.codigo_base || "").toString().trim();
+            if (!raw) return "";
+            if (item?.codigo_base_raw) {
+                return applyPresentacionToCodigoBase(raw, presentacion);
+            }
+            return raw;
+        }
+
+        function getValidPresentaciones(product) {
+            const productNorm = normalize(product);
+            for (const key of Object.keys(PRODUCT_RULES)) {
+                if (productNorm.includes(key)) {
+                    return (PRODUCT_RULES[key].presentaciones || DEFAULT_PRESENTACIONES).slice();
+                }
+            }
+            return DEFAULT_PRESENTACIONES.slice();
+        }
+
+        function applyPresentacionToCodigoBase(rawCodigoBase, presentacion) {
+            const raw = (rawCodigoBase || "").toString().trim();
+            if (!raw) return "";
+            const suffix = getSuffixByPresentacion(presentacion);
+            return suffix ? `${raw}${suffix}` : raw;
+        }
+
+        function buildSelectOptions(values, currentValue) {
+            const list = Array.isArray(values) ? values.slice() : [];
+            const current = (currentValue || "").toString();
+            if (current && !list.includes(current)) {
+                list.push(current);
+            }
+            return list.map(v => `<option value="${escapeHtml(v)}" ${v === current ? "selected" : ""}>${escapeHtml(v)}</option>`).join("");
         }
 
         function getProductUsageScore(name) {
@@ -1832,6 +1911,7 @@
             document.getElementById("base").value = "";
             document.getElementById("ubicacion").value = "";
             document.getElementById("codigoBase").value = "";
+            currentCodigoBaseRaw = "";
             document.getElementById("cantidad").value = 1;
             setSelectOptions("terminacion", DEFAULT_TERMINACIONES);
             setSelectOptions("presentacion", DEFAULT_PRESENTACIONES);
@@ -1853,25 +1933,27 @@
 
             const product = normalize(displayProduct);
             const base = normalize(document.getElementById("base").value);
+            const termSelect = document.getElementById("terminacion");
+            const presSelect = document.getElementById("presentacion");
+            const prevTerm = termSelect.value;
+            const prevPres = presSelect.value;
 
             const term = getValidTerminaciones(product, base);
-            let pres = DEFAULT_PRESENTACIONES;
-            for (const key of Object.keys(PRODUCT_RULES)) {
-                if (product.includes(key)) {
-                    pres = PRODUCT_RULES[key].presentaciones || DEFAULT_PRESENTACIONES;
-                    break;
-                }
-            }
+            const pres = getValidPresentaciones(product);
 
             setSelectOptions("terminacion", term);
             setSelectOptions("presentacion", pres);
 
-            const currentTerm = document.getElementById("terminacion").value;
-            if (currentTerm && !term.includes(currentTerm)) {
-                document.getElementById("terminacion").value = "";
+            if (prevTerm && term.includes(prevTerm)) {
+                termSelect.value = prevTerm;
+            } else if (term.length === 1) {
+                termSelect.value = term[0];
+            } else {
+                termSelect.value = "";
             }
-            if (!document.getElementById("terminacion").value && term.length === 1) {
-                document.getElementById("terminacion").value = term[0];
+
+            if (prevPres && pres.includes(prevPres)) {
+                presSelect.value = prevPres;
             }
 
             refreshCodigoBase();
@@ -2304,16 +2386,28 @@
             const producto = document.getElementById("producto").value.trim();
             const terminacion = document.getElementById("terminacion").value;
             const presentacion = document.getElementById("presentacion").value;
+            const codigoBaseEl = document.getElementById("codigoBase");
+            const currentSeq = ++codigoBaseRequestSeq;
 
             const forcedByProduct = forcedCodeForProductName(producto);
             if (forcedByProduct) {
-                const suffix = getSuffixByPresentacion(presentacion);
-                document.getElementById("codigoBase").value = suffix ? `${forcedByProduct}${suffix}` : forcedByProduct;
+                currentCodigoBaseRaw = forcedByProduct;
+                codigoBaseEl.value = applyPresentacionToCodigoBase(forcedByProduct, presentacion);
                 return;
             }
 
-            if (!base || !producto || !terminacion) {
-                document.getElementById("codigoBase").value = "";
+            if (!base || !producto) {
+                currentCodigoBaseRaw = "";
+                codigoBaseEl.value = "";
+                return;
+            }
+
+            if (!terminacion) {
+                if (currentCodigoBaseRaw) {
+                    codigoBaseEl.value = applyPresentacionToCodigoBase(currentCodigoBaseRaw, presentacion);
+                } else {
+                    codigoBaseEl.value = "";
+                }
                 return;
             }
 
@@ -2326,12 +2420,23 @@
                 if (!res.ok) throw new Error("No se pudo calcular codigo base");
                 const data = await res.json();
 
+                if (currentSeq !== codigoBaseRequestSeq) return;
+
                 const raw = (data.codigo_base || "").toString().trim();
                 const invalid = !raw || raw.includes("{") || raw.includes("}") || /no aplica|no encontrado|error/i.test(raw);
-                const suf = getSuffixByPresentacion(presentacion);
-                document.getElementById("codigoBase").value = invalid ? "" : `${raw}${suf}`;
+                if (invalid) {
+                    currentCodigoBaseRaw = "";
+                    codigoBaseEl.value = "";
+                    return;
+                }
+
+                currentCodigoBaseRaw = raw;
+                const latestPresentacion = document.getElementById("presentacion").value;
+                codigoBaseEl.value = applyPresentacionToCodigoBase(raw, latestPresentacion);
             } catch {
-                document.getElementById("codigoBase").value = "";
+                if (currentSeq !== codigoBaseRequestSeq) return;
+                currentCodigoBaseRaw = "";
+                codigoBaseEl.value = "";
             }
         }
 
@@ -2359,6 +2464,7 @@
                 base,
                 ubicacion,
                 codigo_base,
+                codigo_base_raw: currentCodigoBaseRaw || codigo_base,
                 prioridad: document.getElementById("prioridad")?.value || "Media"
             };
 
@@ -2391,6 +2497,7 @@
             document.getElementById("presentacion").value = item.presentacion || "";
             document.getElementById("cantidad").value = item.cantidad || 1;
             document.getElementById("codigoBase").value = formatCodigoBaseForItem(item);
+            currentCodigoBaseRaw = (item.codigo_base_raw || item.codigo_base || "").toString().trim();
             const btn = document.querySelector("button[onclick='addToQueue()']");
             if (btn) btn.textContent = "Actualizar Producto";
             switchProductTab(null, "capture");
@@ -2540,15 +2647,27 @@
             } else {
                 body.innerHTML = queue.map((item, idx) => `
                     <tr>
-                        <td ondblclick="editQueueItem(${idx})">${item.codigo}</td>
-                        <td>${item.descripcion || "-"}</td>
-                        <td>${item.producto}</td>
-                        <td>${item.terminacion || "-"}</td>
-                        <td>${item.presentacion || "-"}</td>
-                        <td ondblclick="editQueueItem(${idx})">${item.cantidad}</td>
-                        <td>${item.base || "-"}</td>
-                        <td>${formatCodigoBaseForItem(item) || "-"}</td>
-                        <td><button class="btn btn-danger" onclick="removeQueueItem(${idx})">Quitar</button></td>
+                        <td ondblclick="editQueueItem(${idx})"><div class="queue-cell-content">${item.codigo}</div></td>
+                        <td><div class="queue-cell-content">${item.descripcion || "-"}</div></td>
+                        <td><div class="queue-cell-content">${item.producto}</div></td>
+                        <td>
+                            <div class="queue-cell-control">
+                                <select class="queue-inline-select" onchange="updateQueueTerminacion(${idx}, this.value)">
+                                    ${buildSelectOptions(getValidTerminaciones(item.producto || "", item.base || ""), item.terminacion || "")}
+                                </select>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="queue-cell-control">
+                                <select class="queue-inline-select" onchange="updateQueuePresentacion(${idx}, this.value)">
+                                    ${buildSelectOptions(getValidPresentaciones(item.producto || ""), item.presentacion || "")}
+                                </select>
+                            </div>
+                        </td>
+                        <td ondblclick="editQueueItem(${idx})"><div class="queue-cell-content">${item.cantidad}</div></td>
+                        <td><div class="queue-cell-content">${item.base || "-"}</div></td>
+                        <td><div class="queue-cell-content">${formatCodigoBaseForItem(item) || "-"}</div></td>
+                        <td><div class="queue-cell-action"><button class="btn btn-danger" onclick="removeQueueItem(${idx})">Quitar</button></div></td>
                     </tr>
                 `).join("");
             }
@@ -2556,6 +2675,71 @@
             const total = queue.reduce((acc, i) => acc + Number(i.cantidad || 0), 0);
             document.getElementById("summary").textContent = `${queue.length} item(s) · ${total} unidades`;
             updateWorkflowHint();
+        }
+
+        async function recalculateQueueItemCodigoBase(index) {
+            const item = queue[index];
+            if (!item) return;
+
+            const forcedByProduct = forcedCodeForProductName(item.producto || "");
+            if (forcedByProduct) {
+                item.codigo_base_raw = forcedByProduct;
+                item.codigo_base = applyPresentacionToCodigoBase(forcedByProduct, item.presentacion || "");
+                renderQueue();
+                return;
+            }
+
+            if (!item.base || !item.producto || !item.terminacion) {
+                item.codigo_base_raw = "";
+                item.codigo_base = "";
+                renderQueue();
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API}/api/v1/labelsapp/codigo-base`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        base: item.base,
+                        producto: item.producto,
+                        terminacion: item.terminacion
+                    })
+                });
+
+                if (!res.ok) throw new Error("No se pudo calcular codigo base");
+                const data = await res.json();
+
+                const raw = (data.codigo_base || "").toString().trim();
+                const invalid = !raw || raw.includes("{") || raw.includes("}") || /no aplica|no encontrado|error/i.test(raw);
+                item.codigo_base_raw = invalid ? "" : raw;
+                item.codigo_base = invalid ? "" : applyPresentacionToCodigoBase(raw, item.presentacion || "");
+            } catch {
+                item.codigo_base_raw = "";
+                item.codigo_base = "";
+            }
+
+            renderQueue();
+        }
+
+        async function updateQueueTerminacion(index, value) {
+            const item = queue[index];
+            if (!item) return;
+            item.terminacion = value;
+            await recalculateQueueItemCodigoBase(index);
+        }
+
+        function updateQueuePresentacion(index, value) {
+            const item = queue[index];
+            if (!item) return;
+            item.presentacion = value;
+            if (item.codigo_base_raw) {
+                item.codigo_base = applyPresentacionToCodigoBase(item.codigo_base_raw, value);
+                renderQueue();
+                return;
+            }
+
+            recalculateQueueItemCodigoBase(index);
         }
 
         function renderLiveQueue() {
@@ -2704,6 +2888,7 @@
                         cantidad: item.cantidad || 1,
                         base: item.base || "",
                         ubicacion: item.ubicacion || "",
+                        codigo_base_raw: item.codigo_base_raw || "",
                         codigo_base: formatCodigoBaseForItem(item),
                         prioridad: item.prioridad || "Media"
                     });
@@ -2807,7 +2992,6 @@
             try {
                 const payload = {
                     id_factura,
-                    id_cliente: document.getElementById("idCliente").value.trim(),
                     prioridad,
                     username: user.username,
                     usuario_id: user.id,
@@ -3024,7 +3208,11 @@
         });
         document.getElementById("presentacion").addEventListener("change", () => {
             setWorkflowStep("cantidad");
-            refreshCodigoBase();
+            if (currentCodigoBaseRaw) {
+                document.getElementById("codigoBase").value = applyPresentacionToCodigoBase(currentCodigoBaseRaw, document.getElementById("presentacion").value);
+            } else {
+                refreshCodigoBase();
+            }
         });
         document.getElementById("cantidad").addEventListener("input", () => {
             const cantidad = Math.max(1, Number(document.getElementById("cantidad").value || 1));
