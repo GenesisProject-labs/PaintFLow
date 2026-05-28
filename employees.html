@@ -1573,20 +1573,38 @@
             map.set(normalizeTextBasic('Samaná'), 'Zona_Norte');
             map.set(normalizeTextBasic('Samana'), 'Zona_Norte');
             map.set(normalizeTextBasic('Bani'), 'Zona_Sur');
+            map.set(normalizeTextBasic('Bellavista'), 'Santo_Domingo');
+            map.set(normalizeTextBasic('Sanmartin'), 'Santo_Domingo');
+            map.set(normalizeTextBasic('Puntacana'), 'Zona_Este');
+            map.set(normalizeTextBasic('Rafaelvidal'), 'Zona_Norte');
             return map;
         })();
 
-        function resolveAnalystZona(name, zonaHint = '') {
-            const hintedZone = toSubtabZoneKey(zonaHint);
-            if (ANALYST_ZONE_KEYS.includes(hintedZone)) {
-                return hintedZone;
-            }
+        const ANALYST_SUCURSAL_TO_ZONE_COMPACT = (() => {
+            const compact = new Map();
+            ANALYST_SUCURSAL_TO_ZONE.forEach((zone, name) => {
+                compact.set(name.replace(/\s+/g, ''), zone);
+            });
+            return compact;
+        })();
 
+        function resolveAnalystZona(name, zonaHint = '') {
             const target = normalizeTextBasic(name);
             if (!target) return 'Sin_Zona';
             if (ANALYST_SUCURSAL_TO_ZONE.has(target)) {
                 return ANALYST_SUCURSAL_TO_ZONE.get(target);
             }
+
+            const compactTarget = target.replace(/\s+/g, '');
+            if (ANALYST_SUCURSAL_TO_ZONE_COMPACT.has(compactTarget)) {
+                return ANALYST_SUCURSAL_TO_ZONE_COMPACT.get(compactTarget);
+            }
+
+            const hintedZone = toSubtabZoneKey(zonaHint);
+            if (ANALYST_ZONE_KEYS.includes(hintedZone) && ANALYST_SUCURSAL_TO_ZONE.has(target)) {
+                return hintedZone;
+            }
+
             return 'Sin_Zona';
         }
 
@@ -1594,9 +1612,9 @@
             const target = String(name || '').trim();
             if (!target) return false;
 
-            const hintedZone = toSubtabZoneKey(zonaHint);
-            if (ANALYST_ZONE_KEYS.includes(hintedZone)) {
-                return true;
+            const normalized = normalizeTextBasic(target);
+            if (/\b(departamento|gerencia|despacho|reserva|prueba|test|otrotest|pc)\b/.test(normalized)) {
+                return false;
             }
 
             return resolveAnalystZona(name, zonaHint) !== 'Sin_Zona';
