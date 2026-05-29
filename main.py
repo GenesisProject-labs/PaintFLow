@@ -215,6 +215,15 @@ async def labelsapp_web_page():
     raise HTTPException(status_code=404, detail="LabelsApp Web page not found")
 
 
+@app.get("/labelsapp-feedback")
+async def labelsapp_feedback_page():
+    """Servir formulario de encuesta para LabelsApp Web"""
+    html_path = os.path.join(os.path.dirname(__file__), "labelsapp_feedback.html")
+    if os.path.exists(html_path):
+        return FileResponse(html_path, media_type="text/html")
+    raise HTTPException(status_code=404, detail="LabelsApp Feedback page not found")
+
+
 def _normalize_sucursal_slug(text: str) -> str:
     raw = (text or "").strip().lower()
     if not raw:
@@ -253,6 +262,7 @@ def _normalize_zona_key(text: str) -> str:
 
 
 PERSONALIZADOS_CSV_PATH = os.path.join(os.path.dirname(__file__), "productos_personalizados.csv")
+LABELSAPP_FEEDBACK_CSV_PATH = os.path.join(os.path.dirname(__file__), "labelsapp_feedback.csv")
 PERSONALIZADO_CODIGO_MAX = 7
 PERSONALIZADO_NOMBRE_MAX = 20
 
@@ -260,6 +270,22 @@ PERSONALIZADO_NOMBRE_MAX = 20
 class LabelsAppPersonalizedProductRequest(BaseModel):
     codigo: str
     nombre: str
+
+
+class LabelsAppFeedbackRequest(BaseModel):
+    rendimiento: int
+    facilidad_uso: int
+    estabilidad: int
+    implementacion_web: int
+    satisfaccion_general: int
+    recomendaria: Optional[str] = ""
+    comentario_general: Optional[str] = ""
+    mejoras_sugeridas: Optional[str] = ""
+    errores_reportados: Optional[str] = ""
+    username: Optional[str] = None
+    usuario_id: Optional[int] = None
+    sucursal: Optional[str] = None
+    modulo: Optional[str] = "labelsapp-web"
 
 
 def _load_personalized_products() -> List[dict]:
@@ -1466,6 +1492,80 @@ async def labelsapp_delete_personalized_product(
         raise HTTPException(status_code=404, detail="Código no encontrado en productos personalizados")
     _save_personalized_products(filtered)
     return {"message": "Producto personalizado eliminado", "codigo": codigo}
+
+
+def _append_labelsapp_feedback_row(row: dict) -> None:
+    fieldnames = [
+        "fecha_registro",
+        "modulo",
+        "username",
+        "usuario_id",
+        "sucursal",
+        "rendimiento",
+        "facilidad_uso",
+        "estabilidad",
+        "implementacion_web",
+        "satisfaccion_general",
+        "recomendaria",
+        "comentario_general",
+        "mejoras_sugeridas",
+        "errores_reportados",
+        "ip_origen",
+    ]
+
+    file_exists = os.path.exists(LABELSAPP_FEEDBACK_CSV_PATH)
+    with open(LABELSAPP_FEEDBACK_CSV_PATH, "a", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow({k: row.get(k, "") for k in fieldnames})
+
+
+@app.post("/api/v1/labelsapp/feedback")
+async def labelsapp_feedback_submit(payload: LabelsAppFeedbackRequest, request: Request):
+    """Guardar encuesta de percepcion sobre LabelsApp Web."""
+    try:
+        ratings = [
+            int(payload.rendimiento),
+            int(payload.facilidad_uso),
+            int(payload.estabilidad),
+            int(payload.implementacion_web),
+            int(payload.satisfaccion_general),
+        ]
+    except Exception:
+        raise HTTPException(status_code=400, detail="Las calificaciones deben ser numericas")
+
+    if any(v < 1 or v > 5 for v in ratings):
+        raise HTTPException(status_code=400, detail="Las calificaciones deben estar entre 1 y 5")
+
+    def _clean_text(value: Optional[str], max_len: int = 1200) -> str:
+        return (value or "").strip()[:max_len]
+
+    row = {
+        "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "modulo": _clean_text(payload.modulo or "labelsapp-web", 64),
+        "username": _clean_text(payload.username, 120),
+        "usuario_id": str(payload.usuario_id or ""),
+        "sucursal": _clean_text(payload.sucursal, 120),
+        "rendimiento": str(ratings[0]),
+        "facilidad_uso": str(ratings[1]),
+        "estabilidad": str(ratings[2]),
+        "implementacion_web": str(ratings[3]),
+        "satisfaccion_general": str(ratings[4]),
+        "recomendaria": _clean_text(payload.recomendaria, 64),
+        "comentario_general": _clean_text(payload.comentario_general),
+        "mejoras_sugeridas": _clean_text(payload.mejoras_sugeridas),
+        "errores_reportados": _clean_text(payload.errores_reportados),
+        "ip_origen": _clean_text(getattr(request.client, "host", ""), 120),
+    }
+
+    try:
+        _append_labelsapp_feedback_row(row)
+    except Exception as e:
+        logger.error(f"Error saving labelsapp feedback: {e}")
+        raise HTTPException(status_code=500, detail="No se pudo guardar la encuesta")
+
+    return {"message": "Gracias por tu retroalimentacion", "saved": True}
 
 
 @app.post("/api/v1/labelsapp/codigo-base")

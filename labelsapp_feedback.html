@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Encuesta LabelsApp Web - PaintFlow</title>
+    <style>
+        :root {
+            --bg: #eef3f8;
+            --card: #ffffff;
+            --text: #13212f;
+            --muted: #5d7285;
+            --line: #d6e0ea;
+            --brand: #0f766e;
+            --brand-2: #1d4ed8;
+            --warn: #b91c1c;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(900px 340px at 15% -10%, rgba(29, 78, 216, 0.08), transparent 60%),
+                radial-gradient(760px 300px at 95% -20%, rgba(15, 118, 110, 0.08), transparent 60%),
+                var(--bg);
+        }
+
+        .wrap {
+            width: min(980px, 92vw);
+            margin: 30px auto;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            box-shadow: 0 14px 30px rgba(12, 32, 58, 0.08);
+            overflow: hidden;
+        }
+
+        .hero {
+            padding: 20px 22px;
+            border-bottom: 1px solid var(--line);
+            background: linear-gradient(120deg, rgba(29, 78, 216, 0.08), rgba(15, 118, 110, 0.08));
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: clamp(1.25rem, 2.8vw, 1.7rem);
+        }
+
+        .sub {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.4;
+            font-size: 0.95rem;
+        }
+
+        form {
+            padding: 20px 22px 24px;
+            display: grid;
+            gap: 16px;
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 6px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            border: 1px solid #c8d7e6;
+            border-radius: 10px;
+            padding: 9px 10px;
+            font: inherit;
+            color: var(--text);
+            background: #fff;
+        }
+
+        textarea {
+            min-height: 90px;
+            resize: vertical;
+        }
+
+        .metric {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .metric-title {
+            margin: 0 0 10px;
+            font-size: 0.95rem;
+            font-weight: 700;
+        }
+
+        .scale {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .scale label {
+            margin: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 500;
+            padding: 5px 8px;
+            border-radius: 999px;
+            border: 1px solid #d7e3ef;
+            background: #f8fbff;
+        }
+
+        .help {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.83rem;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+            padding-top: 4px;
+        }
+
+        .btn {
+            border: 1px solid transparent;
+            border-radius: 10px;
+            padding: 10px 14px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 0.92rem;
+        }
+
+        .btn-primary {
+            color: #fff;
+            background: linear-gradient(135deg, var(--brand-2), var(--brand));
+        }
+
+        .btn-light {
+            color: #13324d;
+            border-color: #c8d7e6;
+            background: #fff;
+        }
+
+        .status {
+            min-height: 20px;
+            font-size: 0.9rem;
+            margin: 0;
+            padding-left: 2px;
+        }
+
+        .status.ok { color: #0f766e; }
+        .status.err { color: var(--warn); }
+
+        @media (max-width: 860px) {
+            .meta-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <main class="wrap">
+        <section class="card">
+            <header class="hero">
+                <h1>Encuesta de Rendimiento LabelsApp Web</h1>
+                <p class="sub">Tu opinion nos ayuda a mejorar velocidad, estabilidad y experiencia del modulo web. Escala: 1 (muy malo) a 5 (excelente).</p>
+            </header>
+
+            <form id="feedbackForm">
+                <div class="meta-grid">
+                    <div>
+                        <label for="username">Usuario</label>
+                        <input id="username" name="username" placeholder="Ej: caja_sanmartin" />
+                    </div>
+                    <div>
+                        <label for="usuario_id">ID de usuario</label>
+                        <input id="usuario_id" name="usuario_id" placeholder="Ej: 54" />
+                    </div>
+                    <div>
+                        <label for="sucursal">Sucursal</label>
+                        <input id="sucursal" name="sucursal" placeholder="Ej: San Martin" />
+                    </div>
+                </div>
+
+                <div class="metric">
+                    <p class="metric-title">Rendimiento general (carga y respuesta)</p>
+                    <div class="scale" data-metric="rendimiento"></div>
+                </div>
+
+                <div class="metric">
+                    <p class="metric-title">Facilidad de uso</p>
+                    <div class="scale" data-metric="facilidad_uso"></div>
+                </div>
+
+                <div class="metric">
+                    <p class="metric-title">Estabilidad (errores, bloqueos, fallas)</p>
+                    <div class="scale" data-metric="estabilidad"></div>
+                </div>
+
+                <div class="metric">
+                    <p class="metric-title">Calidad de implementacion web frente al flujo escritorio</p>
+                    <div class="scale" data-metric="implementacion_web"></div>
+                </div>
+
+                <div class="metric">
+                    <p class="metric-title">Satisfaccion general con LabelsApp Web</p>
+                    <div class="scale" data-metric="satisfaccion_general"></div>
+                </div>
+
+                <div>
+                    <label for="recomendaria">Lo recomendarias al equipo?</label>
+                    <select id="recomendaria" name="recomendaria">
+                        <option value="">Seleccionar...</option>
+                        <option value="Si">Si</option>
+                        <option value="No">No</option>
+                        <option value="Con reservas">Con reservas</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="comentario_general">Comentario general</label>
+                    <textarea id="comentario_general" name="comentario_general" placeholder="Que te gusto y que no te gusto?"></textarea>
+                </div>
+
+                <div>
+                    <label for="mejoras_sugeridas">Mejoras sugeridas</label>
+                    <textarea id="mejoras_sugeridas" name="mejoras_sugeridas" placeholder="Que deberiamos mejorar en el modulo?"></textarea>
+                </div>
+
+                <div>
+                    <label for="errores_reportados">Errores reportados (opcional)</label>
+                    <textarea id="errores_reportados" name="errores_reportados" placeholder="Describe errores o comportamientos inesperados"></textarea>
+                </div>
+
+                <p id="status" class="status"></p>
+
+                <div class="actions">
+                    <button type="button" class="btn btn-light" onclick="window.location.href='/labelsapp-web'">Volver a LabelsApp</button>
+                    <button type="submit" class="btn btn-primary">Enviar encuesta</button>
+                </div>
+                <p class="help">Las respuestas se guardan para analisis interno de PaintFlow.</p>
+            </form>
+        </section>
+    </main>
+
+    <script>
+        const API = window.location.origin;
+
+        function buildScale(metricName) {
+            const container = document.querySelector(`[data-metric="${metricName}"]`);
+            if (!container) return;
+            container.innerHTML = "";
+            for (let i = 1; i <= 5; i += 1) {
+                const id = `${metricName}_${i}`;
+                const label = document.createElement("label");
+                label.htmlFor = id;
+                label.innerHTML = `<input type="radio" id="${id}" name="${metricName}" value="${i}" ${i === 4 ? "checked" : ""} required /> ${i}`;
+                container.appendChild(label);
+            }
+        }
+
+        function prefillFromSession() {
+            try {
+                const raw = localStorage.getItem("currentUser");
+                if (!raw) return;
+                const user = JSON.parse(raw);
+                const usernameEl = document.getElementById("username");
+                const idEl = document.getElementById("usuario_id");
+                const sucEl = document.getElementById("sucursal");
+                if (usernameEl && !usernameEl.value) usernameEl.value = user.username || "";
+                if (idEl && !idEl.value) idEl.value = user.id || "";
+                if (sucEl && !sucEl.value) sucEl.value = user.sucursal || user.sucursal_nombre || "";
+            } catch (_) {}
+        }
+
+        function setStatus(text, isError) {
+            const el = document.getElementById("status");
+            if (!el) return;
+            el.textContent = text || "";
+            el.className = `status ${isError ? "err" : "ok"}`;
+        }
+
+        async function submitFeedback(event) {
+            event.preventDefault();
+            setStatus("Enviando encuesta...", false);
+
+            const form = document.getElementById("feedbackForm");
+            const data = new FormData(form);
+            const payload = {
+                rendimiento: Number(data.get("rendimiento") || 0),
+                facilidad_uso: Number(data.get("facilidad_uso") || 0),
+                estabilidad: Number(data.get("estabilidad") || 0),
+                implementacion_web: Number(data.get("implementacion_web") || 0),
+                satisfaccion_general: Number(data.get("satisfaccion_general") || 0),
+                recomendaria: String(data.get("recomendaria") || ""),
+                comentario_general: String(data.get("comentario_general") || ""),
+                mejoras_sugeridas: String(data.get("mejoras_sugeridas") || ""),
+                errores_reportados: String(data.get("errores_reportados") || ""),
+                username: String(data.get("username") || ""),
+                usuario_id: data.get("usuario_id") ? Number(data.get("usuario_id")) : null,
+                sucursal: String(data.get("sucursal") || ""),
+                modulo: "labelsapp-web"
+            };
+
+            try {
+                const res = await fetch(`${API}/api/v1/labelsapp/feedback`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                const body = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(body.detail || "No se pudo enviar la encuesta");
+                }
+                setStatus("Gracias. Tu respuesta fue guardada correctamente.", false);
+                form.reset();
+                ["rendimiento", "facilidad_uso", "estabilidad", "implementacion_web", "satisfaccion_general"].forEach((k) => {
+                    const radio = document.getElementById(`${k}_4`);
+                    if (radio) radio.checked = true;
+                });
+                prefillFromSession();
+            } catch (err) {
+                setStatus(err.message || "Error enviando encuesta", true);
+            }
+        }
+
+        ["rendimiento", "facilidad_uso", "estabilidad", "implementacion_web", "satisfaccion_general"].forEach(buildScale);
+        prefillFromSession();
+        document.getElementById("feedbackForm").addEventListener("submit", submitFeedback);
+    </script>
+</body>
+</html>
