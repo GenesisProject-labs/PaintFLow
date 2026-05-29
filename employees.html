@@ -1037,6 +1037,8 @@
             backdrop-filter: blur(8px);
             box-shadow: 0 10px 28px rgba(17, 48, 85, 0.08);
             padding: 14px 24px;
+            z-index: 3000;
+            overflow: visible;
         }
 
         .header-content {
@@ -1046,6 +1048,15 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            overflow: visible;
+        }
+
+        .user-menu-container {
+            z-index: 3200;
+        }
+
+        .dropdown-menu {
+            z-index: 3300;
         }
 
         .title,
