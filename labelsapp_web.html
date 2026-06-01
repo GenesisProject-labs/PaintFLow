@@ -1125,6 +1125,7 @@
         const codeIndex = [];
         const queue = [];
         const liveQueue = [];
+        const pendingQueue = [];
         const customProducts = [];
         const heldLists = [];
         let historyEntries = [];
@@ -1139,6 +1140,7 @@
         let liveQueueTimer = null;
         let liveEventSource = null;
         let liveQueueLoading = false;
+        let pendingQueueLoading = false;
         let labelsAppTab = "queue";
         let productTab = "capture";
         let editingQueueIndex = -1;
@@ -2729,15 +2731,39 @@
             const body = document.getElementById("heldListsBody");
             const summary = document.getElementById("holdSummary");
             if (summary) {
-                const totalItems = heldLists.reduce((acc, l) => acc + Number((l.items || []).length), 0);
-                summary.textContent = `${heldLists.length} listas en espera · ${totalItems} items`;
+                const localItems = heldLists.reduce((acc, l) => acc + Number((l.items || []).length), 0);
+                const pendingItems = pendingQueue.reduce((acc, p) => acc + Number(p.items || 0), 0);
+                summary.textContent = `${pendingQueue.length} factura(s) pendientes · ${pendingItems} items` + (heldLists.length ? ` · ${heldLists.length} borrador(es) locales` : "");
             }
             if (!body) return;
-            if (!heldLists.length) {
+            if (!pendingQueue.length && !heldLists.length) {
                 body.innerHTML = `<tr><td colspan="5" class="empty">No hay listas en espera</td></tr>`;
                 return;
             }
-            body.innerHTML = heldLists.map((l) => `
+
+            const pendingRows = pendingQueue.map((p) => `
+                <tr>
+                    <td>
+                        <div class="queue-cell-content">${escapeHtml(p.cliente || p.factura || "—")}</div>
+                        <div class="queue-cell-content" style="font-size:12px; color:#6b7a90;">${escapeHtml(p.factura || "—")}</div>
+                    </td>
+                    <td>${Number(p.items || 0)}</td>
+                    <td>
+                        <select onchange="updateLivePriority('${escapeHtml(p.factura || "")}', this.value)">
+                            <option ${p.prioridad === "Alta" ? "selected" : ""}>Alta</option>
+                            <option ${p.prioridad === "Media" ? "selected" : ""}>Media</option>
+                            <option ${p.prioridad === "Baja" ? "selected" : ""}>Baja</option>
+                        </select>
+                    </td>
+                    <td>${escapeHtml(p.created_at ? new Date(p.created_at).toLocaleString() : "-")}</td>
+                    <td>
+                        <button class="btn btn-link" onclick="editFacturaFromLive('${escapeHtml(p.factura || "")}')">Editar</button>
+                        <button class="btn btn-danger" onclick="cancelFacturaFromLive('${escapeHtml(p.factura || "")}')">Cancelar</button>
+                    </td>
+                </tr>
+            `).join("");
+
+            const localRows = heldLists.map((l) => `
                 <tr>
                     <td>${escapeHtml(l.factura || "-")}</td>
                     <td>${Number((l.items || []).length)}</td>
@@ -2755,6 +2781,36 @@
                     </td>
                 </tr>
             `).join("");
+
+            body.innerHTML = pendingRows + localRows;
+        }
+
+        async function loadPendingQueue() {
+            const user = ensureSession();
+            if (!user || pendingQueueLoading) return;
+
+            pendingQueueLoading = true;
+            try {
+                const params = new URLSearchParams({
+                    limit: "80"
+                });
+                if (user.username) params.set("username", user.username);
+                if (user.id) params.set("usuario_id", String(user.id));
+                if (user.sucursal || user.sucursal_nombre) params.set("sucursal", user.sucursal || user.sucursal_nombre);
+
+                const res = await fetch(`${API}/api/v1/labelsapp/pending-queue?${params.toString()}`);
+                if (!res.ok) throw new Error("No se pudo cargar la cola en espera");
+
+                const data = await res.json();
+                pendingQueue.length = 0;
+                for (const item of (data.items || [])) pendingQueue.push(item);
+                renderHeldLists();
+            } catch (_) {
+                pendingQueue.length = 0;
+                renderHeldLists();
+            } finally {
+                pendingQueueLoading = false;
+            }
         }
 
         function updateHeldPriority(id, value) {
@@ -2931,6 +2987,8 @@
                 source.addEventListener("pedidos_actualizados", () => {
                     if (labelsAppTab === "live") {
                         loadLiveQueue();
+                    } else if (labelsAppTab === "hold") {
+                        loadPendingQueue();
                     }
                 });
                 source.addEventListener("ping", () => {});
@@ -3078,7 +3136,13 @@
             }
 
             if (active) {
-                liveQueueTimer = setInterval(loadLiveQueue, 4000);
+                liveQueueTimer = setInterval(() => {
+                    if (labelsAppTab === "live") {
+                        loadLiveQueue();
+                    } else if (labelsAppTab === "hold") {
+                        loadPendingQueue();
+                    }
+                }, 4000);
                 openLiveEventStream();
             } else {
                 closeLiveEventStream();
@@ -3101,9 +3165,12 @@
             if (liveTab) liveTab.classList.toggle("active", labelsAppTab === "live");
             if (historyTab) historyTab.classList.toggle("active", labelsAppTab === "history");
 
-            setLivePolling(labelsAppTab === "live");
+            setLivePolling(labelsAppTab === "live" || labelsAppTab === "hold");
             if (labelsAppTab === "live") {
                 loadLiveQueue();
+            }
+            if (labelsAppTab === "hold") {
+                loadPendingQueue();
             }
             if (labelsAppTab === "history") {
                 renderHistory();

@@ -621,6 +621,10 @@ def _get_labelsapp_live_queue(db, table_name: str, limit: int = 50):
         WHERE TRIM(COALESCE(estado,'')) <> 'Cancelado'
         GROUP BY id_factura
         HAVING SUM(CASE WHEN TRIM(COALESCE(estado,'')) IN ('Finalizado','Completado') THEN 1 ELSE 0 END) < COUNT(*)
+           AND (
+               SUM(CASE WHEN TRIM(COALESCE(estado,'')) = 'En Proceso' THEN 1 ELSE 0 END) > 0
+               OR SUM(CASE WHEN TRIM(COALESCE(estado,'')) IN ('Finalizado','Completado') THEN 1 ELSE 0 END) > 0
+           )
         ORDER BY pr_rank DESC, id_factura DESC
         LIMIT %s
         """,
@@ -645,6 +649,42 @@ def _get_labelsapp_live_queue(db, table_name: str, limit: int = 50):
             "finalizados": int(cnt_final or 0),
             "prioridad": prioridad_txt,
             "estado": estado_txt,
+        })
+    return items
+
+
+def _get_labelsapp_pending_queue(db, table_name: str, limit: int = 80):
+    cur = db.cursor()
+    cur.execute(
+        f"""
+        SELECT id_factura,
+               MAX(COALESCE(id_cliente, '')) AS id_cliente,
+               COUNT(*) AS total,
+               MAX(CASE TRIM(COALESCE(prioridad,'')) WHEN 'Alta' THEN 3 WHEN 'Media' THEN 2 WHEN 'Baja' THEN 1 ELSE 0 END) AS pr_rank,
+               MAX(COALESCE(operador, '—')) AS operador,
+               MAX(fecha_creacion) AS created_at
+        FROM {table_name}
+        WHERE TRIM(COALESCE(estado,'')) <> 'Cancelado'
+        GROUP BY id_factura
+        HAVING SUM(CASE WHEN TRIM(COALESCE(estado,'')) IN ('Finalizado','Completado') THEN 1 ELSE 0 END) = 0
+           AND SUM(CASE WHEN TRIM(COALESCE(estado,'')) = 'En Proceso' THEN 1 ELSE 0 END) = 0
+        ORDER BY pr_rank DESC, MAX(fecha_creacion) DESC, id_factura DESC
+        LIMIT %s
+        """,
+        (limit,)
+    )
+    rows = cur.fetchall()
+    items = []
+    for factura, id_cliente, total, pr_rank, operador, created_at in rows:
+        prioridad_txt = 'Alta' if pr_rank == 3 else ('Media' if pr_rank == 2 else ('Baja' if pr_rank == 1 else '—'))
+        items.append({
+            "factura": factura or '—',
+            "cliente": (id_cliente or '').strip() or '—',
+            "items": int(total or 0),
+            "operador": operador or '—',
+            "prioridad": prioridad_txt,
+            "estado": 'Pendiente',
+            "created_at": created_at.isoformat() if created_at else None,
         })
     return items
 
@@ -2263,6 +2303,36 @@ async def labelsapp_live_queue(
     except Exception as e:
         logger.error(f"Error fetching labelsapp live queue: {e}")
         raise HTTPException(status_code=500, detail="Error consultando la cola en tiempo real")
+
+
+@app.get("/api/v1/labelsapp/pending-queue")
+async def labelsapp_pending_queue(
+    limit: int = 80,
+    username: Optional[str] = None,
+    usuario_id: Optional[int] = None,
+    sucursal: Optional[str] = None,
+    db=Depends(get_db)
+):
+    """Obtener la cola pendiente (en espera) por sucursal para facturador."""
+    try:
+        limit = max(1, min(int(limit or 80), 250))
+        sucursal_slug = _resolve_sucursal_slug(db, username=username, usuario_id=usuario_id, sucursal_text=sucursal)
+        table_name = _safe_table_for_sucursal(sucursal_slug)
+
+        _ensure_pedidos_table(db, table_name)
+        items = _get_labelsapp_pending_queue(db, table_name, limit=limit)
+
+        return {
+            "sucursal": sucursal_slug,
+            "tabla": table_name,
+            "total": len(items),
+            "items": items,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching labelsapp pending queue: {e}")
+        raise HTTPException(status_code=500, detail="Error consultando la cola en espera")
 
 
 @app.get("/api/v1/labelsapp/factura/{id_factura}/items")
