@@ -863,6 +863,9 @@
             "superpaint": { terminaciones: ["Satin"], presentaciones: ["Galon"] }
         };
 
+        const MAX_VISIBLE_COLORS = 120;
+        const PRODUCTS_FETCH_LIMIT = 1200;
+
         const state = {
             colors: [],
             allColors: [],
@@ -897,6 +900,13 @@
                 .replace(/[\u0300-\u036f]/g, "")
                 .replace(/[^a-z0-9]+/g, " ")
                 .trim();
+        }
+
+        function makeFacturaId(clienteName) {
+            const raw = String(clienteName || "").trim();
+            if (!raw) return `KIOSK-${Date.now()}`;
+            const slug = normalizeText(raw).replace(/\s+/g, "-").slice(0, 28).toUpperCase();
+            return slug ? `CLI-${slug}-${Date.now()}` : `KIOSK-${Date.now()}`;
         }
 
         function getFallbackDescriptionFor(productName) {
@@ -1212,12 +1222,20 @@
                 return;
             }
 
-            root.innerHTML = state.colors.map((item, idx) => `
+            const visibleColors = state.colors.slice(0, MAX_VISIBLE_COLORS);
+            const hiddenCount = Math.max(0, state.colors.length - visibleColors.length);
+
+            root.innerHTML = visibleColors.map((item, idx) => `
                 <article class="card color-card">
                     ${swatchFor(item)}
                     <button class="btn alt color-select" type="button" onclick="selectColor(${idx})">Seleccionar</button>
                 </article>
-            `).join("");
+            `).join("") + (hiddenCount > 0 ? `
+                <article class="card">
+                    <div class="name">Mostrando primeros ${visibleColors.length} colores</div>
+                    <div class="meta">Refina la busqueda para ver los ${hiddenCount} colores restantes.</div>
+                </article>
+            ` : "");
         }
 
         function applyLocalColorFilter(query) {
@@ -1241,8 +1259,9 @@
                 });
             }
 
+            const visibleColors = state.colors.slice(0, MAX_VISIBLE_COLORS);
             renderColors();
-            ensureSherwinColors(state.colors).then(() => renderColors());
+            ensureSherwinColors(visibleColors).then(() => renderColors());
         }
 
         function renderSelectedColorStrip() {
@@ -1553,7 +1572,7 @@
             }
 
             const params = new URLSearchParams();
-            params.set("limit", "0");
+            params.set("limit", String(PRODUCTS_FETCH_LIMIT));
 
             setStatus("Cargando colores...", "info");
             try {
@@ -1600,7 +1619,7 @@
             const role = String((state.currentUser && state.currentUser.rol) || "").toLowerCase();
             const usernameKey = String((state.currentUser && state.currentUser.username) || "").toLowerCase();
             const cliente = (document.getElementById("checkoutCliente").value || "").trim();
-            const idFactura = `KIOSK-${Date.now()}`;
+            const idFactura = makeFacturaId(cliente);
             const prioridadGlobal = String((state.cart[0] && state.cart[0].prioridad) || "Media");
 
             return {

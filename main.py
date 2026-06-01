@@ -596,6 +596,7 @@ def _get_labelsapp_live_queue(db, table_name: str, limit: int = 50):
     cur.execute(
         f"""
         SELECT id_factura,
+               MAX(COALESCE(id_cliente, '')) AS id_cliente,
                COUNT(*) AS total,
                SUM(CASE WHEN TRIM(COALESCE(estado,'')) IN ('Finalizado','Completado') THEN 1 ELSE 0 END) AS cnt_final,
                SUM(CASE WHEN TRIM(COALESCE(estado,'')) = 'En Proceso' THEN 1 ELSE 0 END) AS cnt_proc,
@@ -605,6 +606,10 @@ def _get_labelsapp_live_queue(db, table_name: str, limit: int = 50):
         WHERE TRIM(COALESCE(estado,'')) <> 'Cancelado'
         GROUP BY id_factura
         HAVING SUM(CASE WHEN TRIM(COALESCE(estado,'')) IN ('Finalizado','Completado') THEN 1 ELSE 0 END) < COUNT(*)
+           AND (
+               SUM(CASE WHEN TRIM(COALESCE(estado,'')) = 'En Proceso' THEN 1 ELSE 0 END) > 0
+               OR SUM(CASE WHEN TRIM(COALESCE(estado,'')) IN ('Finalizado','Completado') THEN 1 ELSE 0 END) > 0
+           )
         ORDER BY pr_rank DESC, id_factura DESC
         LIMIT %s
         """,
@@ -612,7 +617,7 @@ def _get_labelsapp_live_queue(db, table_name: str, limit: int = 50):
     )
     rows = cur.fetchall()
     items = []
-    for factura, total, cnt_final, cnt_proc, pr_rank, operador in rows:
+    for factura, id_cliente, total, cnt_final, cnt_proc, pr_rank, operador in rows:
         prioridad_txt = 'Alta' if pr_rank == 3 else ('Media' if pr_rank == 2 else ('Baja' if pr_rank == 1 else '—'))
         if cnt_final == total and total > 0:
             estado_txt = 'Finalizado'
@@ -622,6 +627,7 @@ def _get_labelsapp_live_queue(db, table_name: str, limit: int = 50):
             estado_txt = 'Pendiente'
         items.append({
             "factura": factura or '—',
+            "cliente": (id_cliente or '').strip() or '—',
             "items": int(total or 0),
             "operador": operador or '—',
             "en_proceso": int(cnt_proc or 0),
@@ -694,6 +700,7 @@ def _ensure_pedidos_table(db, table_name: str) -> None:
             id SERIAL PRIMARY KEY,
             id_orden_profesional VARCHAR(20) UNIQUE,
             id_factura VARCHAR(120) NOT NULL,
+            id_cliente VARCHAR(120),
             codigo VARCHAR(60),
             producto VARCHAR(160),
             terminacion VARCHAR(120),
@@ -712,6 +719,7 @@ def _ensure_pedidos_table(db, table_name: str) -> None:
             fecha_completado TIMESTAMP NULL
         )
     """)
+    cur.execute(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS id_cliente VARCHAR(120)")
     cur.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_factura ON {table_name}(id_factura)")
     cur.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_estado ON {table_name}(estado)")
 
@@ -2138,6 +2146,7 @@ async def labelsapp_send(payload: LabelsAppSendRequest, db=Depends(get_db)):
             data = {
                 "id_orden_profesional": _generate_order_id(payload.id_factura, item.codigo, idx),
                 "id_factura": payload.id_factura,
+                "id_cliente": payload.id_cliente,
                 "codigo": item.codigo,
                 "producto": item.producto,
                 "terminacion": item.terminacion,
