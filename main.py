@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
+import asyncio
+import select
+
 from fastapi import FastAPI, HTTPException, Depends, Request, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import json
 import logging
@@ -606,10 +609,6 @@ def _get_labelsapp_live_queue(db, table_name: str, limit: int = 50):
         WHERE TRIM(COALESCE(estado,'')) <> 'Cancelado'
         GROUP BY id_factura
         HAVING SUM(CASE WHEN TRIM(COALESCE(estado,'')) IN ('Finalizado','Completado') THEN 1 ELSE 0 END) < COUNT(*)
-           AND (
-               SUM(CASE WHEN TRIM(COALESCE(estado,'')) = 'En Proceso' THEN 1 ELSE 0 END) > 0
-               OR SUM(CASE WHEN TRIM(COALESCE(estado,'')) IN ('Finalizado','Completado') THEN 1 ELSE 0 END) > 0
-           )
         ORDER BY pr_rank DESC, id_factura DESC
         LIMIT %s
         """,
@@ -636,6 +635,25 @@ def _get_labelsapp_live_queue(db, table_name: str, limit: int = 50):
             "estado": estado_txt,
         })
     return items
+
+
+def _make_labelsapp_notify_payload(action: str, sucursal_slug: str, id_factura: str, **extra) -> str:
+    payload = {
+        "action": action,
+        "sucursal": (sucursal_slug or "principal").strip() or "principal",
+        "id_factura": (id_factura or "").strip(),
+    }
+    for key, value in extra.items():
+        if value is not None:
+            payload[key] = value
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def _notify_labelsapp_update(cur, action: str, sucursal_slug: str, id_factura: str, **extra) -> None:
+    cur.execute(
+        "SELECT pg_notify('pedidos_actualizados', %s)",
+        (_make_labelsapp_notify_payload(action, sucursal_slug, id_factura, **extra),),
+    )
 
 
 def _get_labelsapp_factura_items(db, table_name: str, factura: str, limit: int = 300):
@@ -722,6 +740,9 @@ def _ensure_pedidos_table(db, table_name: str) -> None:
     cur.execute(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS id_cliente VARCHAR(120)")
     cur.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_factura ON {table_name}(id_factura)")
     cur.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_estado ON {table_name}(estado)")
+    cur.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_prioridad ON {table_name}(prioridad)")
+    cur.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_sucursal_estado_factura ON {table_name}(sucursal, estado, id_factura)")
+    cur.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_sucursal_prioridad_factura ON {table_name}(sucursal, prioridad, id_factura)")
 
 
 def _ensure_labelsapp_history_table(db) -> None:
@@ -2176,7 +2197,7 @@ async def labelsapp_send(payload: LabelsAppSendRequest, db=Depends(get_db)):
             inserted += 1
 
         try:
-            cur.execute(f"NOTIFY pedidos_actualizados, 'labels:web:{payload.id_factura}'")
+            _notify_labelsapp_update(cur, "labels:web", sucursal_slug, payload.id_factura, inserted=inserted)
         except Exception:
             pass
 
@@ -2285,7 +2306,7 @@ async def labelsapp_factura_priority(
         )
         updated = int(cur.rowcount or 0)
         try:
-            cur.execute(f"NOTIFY pedidos_actualizados, 'labels:prioridad:{id_factura}:{prioridad}'")
+            _notify_labelsapp_update(cur, "labels:prioridad", sucursal_slug, id_factura, prioridad=prioridad, updated=updated)
         except Exception:
             pass
         db.commit()
@@ -2325,7 +2346,7 @@ async def labelsapp_factura_cancel(
         )
         updated = int(cur.rowcount or 0)
         try:
-            cur.execute(f"NOTIFY pedidos_actualizados, 'labels:cancelado:{id_factura}'")
+            _notify_labelsapp_update(cur, "labels:cancelado", sucursal_slug, id_factura, cancelados=updated)
         except Exception:
             pass
         db.commit()
@@ -2406,7 +2427,7 @@ async def labelsapp_factura_replace_items(
             inserted += 1
 
         try:
-            cur.execute(f"NOTIFY pedidos_actualizados, 'labels:editada:{id_factura}'")
+            _notify_labelsapp_update(cur, "labels:editada", sucursal_slug, id_factura, inserted=inserted)
         except Exception:
             pass
 
@@ -2534,6 +2555,60 @@ async def labelsapp_history(
     except Exception as e:
         logger.error(f"Error getting labelsapp history: {e}")
         raise HTTPException(status_code=500, detail="Error obteniendo historial de LabelsApp")
+
+
+async def _labelsapp_live_events_stream(username: Optional[str], usuario_id: Optional[int], sucursal: Optional[str]):
+    db = DatabasePool.get_connection()
+    try:
+        db.autocommit = True
+        cur = db.cursor()
+        cur.execute("LISTEN pedidos_actualizados")
+
+        requested_sucursal = _resolve_sucursal_slug(db, username=username, usuario_id=usuario_id, sucursal_text=sucursal)
+        yield "retry: 3000\n\n"
+
+        while True:
+            ready = await asyncio.to_thread(select.select, [db], [], [], 20)
+            if ready and ready[0]:
+                db.poll()
+                while db.notifies:
+                    notification = db.notifies.pop(0)
+                    raw_payload = notification.payload or ""
+                    parsed_payload = None
+                    try:
+                        parsed_payload = json.loads(raw_payload)
+                    except Exception:
+                        parsed_payload = {"raw": raw_payload}
+
+                    payload_sucursal = (parsed_payload.get("sucursal") or "").strip() if isinstance(parsed_payload, dict) else ""
+                    if payload_sucursal and payload_sucursal != requested_sucursal:
+                        continue
+
+                    yield f"event: pedidos_actualizados\ndata: {json.dumps(parsed_payload, ensure_ascii=False)}\n\n"
+            else:
+                yield "event: ping\ndata: {}\n\n"
+    except asyncio.CancelledError:
+        return
+    finally:
+        DatabasePool.return_connection(db, close=True)
+
+
+@app.get("/api/v1/labelsapp/live-events")
+async def labelsapp_live_events(
+    username: Optional[str] = None,
+    usuario_id: Optional[int] = None,
+    sucursal: Optional[str] = None,
+):
+    headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+    }
+    return StreamingResponse(
+        _labelsapp_live_events_stream(username=username, usuario_id=usuario_id, sucursal=sucursal),
+        media_type="text/event-stream",
+        headers=headers,
+    )
 
 
 # ============================================================

@@ -1149,6 +1149,7 @@
         let activeProductSuggestionIndex = -1;
         let remoteSuggestTimer = null;
         let liveQueueTimer = null;
+        let liveEventSource = null;
         let liveQueueLoading = false;
         let labelsAppTab = "queue";
         let productTab = "capture";
@@ -2916,6 +2917,44 @@
             `).join("");
         }
 
+        function closeLiveEventStream() {
+            if (liveEventSource) {
+                try {
+                    liveEventSource.close();
+                } catch {
+                    // Ignore stream close errors.
+                }
+                liveEventSource = null;
+            }
+        }
+
+        function openLiveEventStream() {
+            const user = ensureSession();
+            if (!user || labelsAppTab !== "live") return;
+            if (liveEventSource) return;
+
+            try {
+                const params = new URLSearchParams();
+                if (user.username) params.set("username", user.username);
+                if (user.id) params.set("usuario_id", String(user.id));
+                if (user.sucursal || user.sucursal_nombre) params.set("sucursal", user.sucursal || user.sucursal_nombre);
+
+                const source = new EventSource(`${API}/api/v1/labelsapp/live-events?${params.toString()}`);
+                source.addEventListener("pedidos_actualizados", () => {
+                    if (labelsAppTab === "live") {
+                        loadLiveQueue();
+                    }
+                });
+                source.addEventListener("ping", () => {});
+                source.onerror = () => {
+                    closeLiveEventStream();
+                };
+                liveEventSource = source;
+            } catch {
+                closeLiveEventStream();
+            }
+        }
+
         function renderHistory() {
             const body = document.getElementById("historyBody");
             const summary = document.getElementById("historySummary");
@@ -3052,6 +3091,9 @@
 
             if (active) {
                 liveQueueTimer = setInterval(loadLiveQueue, 4000);
+                openLiveEventStream();
+            } else {
+                closeLiveEventStream();
             }
         }
 
