@@ -1852,6 +1852,7 @@
                         <button class="subtab-btn active" onclick="switchRol(event, 'Administrador')">Administrador</button>
                         <button class="subtab-btn" onclick="switchRol(event, 'Operador')">Operador</button>
                         <button class="subtab-btn" onclick="switchRol(event, 'Facturador')">Facturador</button>
+                        <button class="subtab-btn" onclick="switchRol(event, 'Cliente')">Cliente</button>
                         <button class="subtab-btn" onclick="switchRol(event, 'Colorista')">Colorista</button>
                         <button class="subtab-btn" onclick="switchRol(event, 'Analista')">Analista</button>
                         <button class="subtab-btn" onclick="switchRol(event, 'Contabilidad')">Contabilidad</button>
@@ -1873,6 +1874,12 @@
                         <table style="width: 100%; border-collapse: collapse;">
                             <thead><tr style="background: #f5f5f5;"><th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Nombre</th><th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Email</th><th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Sucursal</th><th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Telefono</th><th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Estado</th><th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Acciones</th></tr></thead>
                             <tbody id="tbody-rol-Facturador"><tr><td colspan="6" style="text-align: center;">Sin usuarios</td></tr></tbody>
+                        </table>
+                    </div>
+                    <div id="rol-Cliente" class="subtab-content">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead><tr style="background: #f5f5f5;"><th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Nombre</th><th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Email</th><th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Sucursal</th><th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Telefono</th><th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Estado</th><th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Acciones</th></tr></thead>
+                            <tbody id="tbody-rol-Cliente"><tr><td colspan="6" style="text-align: center;">Sin usuarios</td></tr></tbody>
                         </table>
                     </div>
                     <div id="rol-Colorista" class="subtab-content">
@@ -2122,6 +2129,7 @@
             <div class="form-group"><label>Rol</label><select id="inputRolUsuario">
                 <option value="administrador">Administrador</option>
                 <option value="facturador">Facturador</option>
+                <option value="cliente">Cliente</option>
                 <option value="analista">Analista</option>
                 <option value="colorista">Colorista</option>
                 <option value="operador">Operador</option>
@@ -2149,6 +2157,7 @@
             <div class="form-group"><label>Rol</label><select id="inputRolEmpleado">
                 <option value="administrador">Administrador</option>
                 <option value="facturador">Facturador</option>
+                <option value="cliente">Cliente</option>
                 <option value="analista">Analista</option>
                 <option value="colorista">Colorista</option>
                 <option value="operador">Operador</option>
@@ -2236,7 +2245,7 @@ function normalizeRole(role) {
 
 function isStoreRole(role) {
     const normalized = normalizeRole(role);
-    return normalized === 'facturador' || normalized === 'cajero';
+    return normalized === 'facturador' || normalized === 'cajero' || normalized === 'cliente';
 }
 
 function isClientRole(role) {
@@ -2247,7 +2256,7 @@ function isKioskClientUser(userData) {
     if (!userData || typeof userData !== 'object') return false;
     const username = normalizeRole(userData.username);
     const role = normalizeRole(userData.rol);
-    return username === 'cliente' || role === 'cliente';
+    return username === 'cliente' && role !== 'cliente';
 }
 
 // Verificar si hay sesión activa al cargar la página
@@ -2290,6 +2299,12 @@ async function checkExistingSession() {
                 window.location.href = '/cliente';
                 return;
             }
+
+            if (isClientRole(userRole)) {
+                console.log('Usuario cliente detectado, redirigiendo a /cliente');
+                window.location.href = '/cliente';
+                return;
+            }
             
             // Si es analista CON SESIÓN ACTIVA, redirigir a empleados
             if (userRole === 'analista') {
@@ -2298,16 +2313,10 @@ async function checkExistingSession() {
                 return;
             }
 
-            // Si es facturador/cajero CON SESIÓN ACTIVA, redirigir a LabelsApp Web
+            // Si es facturador/cajero/cliente CON SESIÓN ACTIVA, redirigir a LabelsApp Web
             if (isStoreRole(userRole)) {
                 console.log('Usuario de tienda detectado, redirigiendo a /labelsapp-web');
                 window.location.href = '/labelsapp-web';
-                return;
-            }
-
-            if (isClientRole(userRole)) {
-                console.log('Usuario cliente detectado, redirigiendo a /cliente');
-                window.location.href = '/cliente';
                 return;
             }
             
@@ -2377,16 +2386,16 @@ function goToDashboard() {
             return;
         }
 
-        // Si es facturador/cajero, ir a LabelsApp Web
-        if (isStoreRole(rol)) {
-            console.log('Usuario de tienda detectado, redirigiendo a /labelsapp-web');
-            window.location.href = '/labelsapp-web';
-            return;
-        }
-
         if (isClientRole(rol)) {
             console.log('Usuario cliente detectado, redirigiendo a /cliente');
             window.location.href = '/cliente';
+            return;
+        }
+
+        // Si es facturador/cajero/cliente, ir a LabelsApp Web
+        if (isStoreRole(rol)) {
+            console.log('Usuario de tienda detectado, redirigiendo a /labelsapp-web');
+            window.location.href = '/labelsapp-web';
             return;
         }
         
@@ -2440,15 +2449,15 @@ async function handleLogin(e) {
             return;
         }
 
-        if (isStoreRole(userRole)) {
-            console.log('Usuario de tienda detectado, redirigiendo a /labelsapp-web');
-            window.location.replace('/labelsapp-web');
-            return;
-        }
-
         if (isClientRole(userRole)) {
             console.log('Usuario cliente detectado, redirigiendo a /cliente');
             window.location.replace('/cliente');
+            return;
+        }
+
+        if (isStoreRole(userRole)) {
+            console.log('Usuario de tienda detectado, redirigiendo a /labelsapp-web');
+            window.location.replace('/labelsapp-web');
             return;
         }
 
@@ -3943,6 +3952,7 @@ function renderUsuariosTable(usuarios) {
         'Administrador': usuarios.filter(u => u.rol && u.rol.toLowerCase() === 'administrador'),
         'Operador': usuarios.filter(u => u.rol && u.rol.toLowerCase() === 'operador'),
         'Facturador': usuarios.filter(u => u.rol && u.rol.toLowerCase() === 'facturador'),
+        'Cliente': usuarios.filter(u => u.rol && u.rol.toLowerCase() === 'cliente'),
         'Colorista': usuarios.filter(u => u.rol && u.rol.toLowerCase() === 'colorista'),
         'Analista': usuarios.filter(u => u.rol && u.rol.toLowerCase() === 'analista'),
         'Contabilidad': usuarios.filter(u => u.rol && u.rol.toLowerCase() === 'contabilidad')
@@ -4607,6 +4617,7 @@ function testRenderUsuarios() {
                         <option value="administrador">Administrador</option>
                         <option value="gerente">Gerente</option>
                         <option value="facturador">Facturador (Caja)</option>
+                        <option value="cliente">Cliente (Tienda)</option>
                         <option value="colorista">Colorista</option>
                         <option value="analista">Analista</option>
                         <option value="contabilidad">Contabilidad</option>
@@ -4876,7 +4887,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         <button class="tab-btn" onclick="goToLabelsAppWeb()">LABELSAPP</button>
                     `;
                 }
-            } else if (userRole === 'facturador' || userRole === 'cajero') {
+            } else if (userRole === 'facturador' || userRole === 'cajero' || userRole === 'cliente') {
                 // Menú de operación para tienda
                 dropdown.innerHTML = `
                     <button onclick="goToLabelsAppWeb()" style="color: #111; background: none; padding: 12px 16px; border: none; text-align: left; cursor: pointer; font-size: 0.9em;">LabelsApp Web</button>

@@ -14,7 +14,7 @@ import unicodedata
 from collections import defaultdict
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote
 from urllib.request import Request as UrlRequest, urlopen
 
 class FormulaNormalCreate(BaseModel):
@@ -209,6 +209,58 @@ if os.path.exists(static_dir):
 else:
     logger.warning(f"Static directory not found at: {static_dir}")
 
+PRODUCTOS_MEDIA_DIR = ""
+for _candidate in (
+    os.path.join(os.path.dirname(__file__), "Productos"),
+    os.path.join(os.path.dirname(__file__), "productos"),
+):
+    if os.path.exists(_candidate):
+        PRODUCTOS_MEDIA_DIR = _candidate
+        break
+
+if PRODUCTOS_MEDIA_DIR:
+    app.mount("/productos", StaticFiles(directory=PRODUCTOS_MEDIA_DIR), name="productos")
+else:
+    logger.warning("Productos media directory not found (Productos/productos)")
+
+
+def _humanize_producto_name(filename: str) -> str:
+    name = os.path.splitext(os.path.basename(filename or ""))[0]
+    name = re.sub(r"[-_]+", " ", name).strip()
+    if not name:
+        return "Producto"
+    return " ".join(piece.capitalize() if piece.islower() else piece for piece in name.split())
+
+
+@app.get("/api/v1/productos/catalog")
+async def productos_catalog():
+    """Lista imágenes del catálogo de productos para pantalla touch."""
+    if not PRODUCTOS_MEDIA_DIR:
+        return {"total": 0, "productos": []}
+
+    allowed_ext = {".png", ".jpg", ".jpeg", ".webp"}
+    files = []
+    try:
+        for entry in os.listdir(PRODUCTOS_MEDIA_DIR):
+            ext = os.path.splitext(entry)[1].lower()
+            if ext in allowed_ext:
+                files.append(entry)
+    except Exception as e:
+        logger.warning(f"Error listing productos catalog: {e}")
+        return {"total": 0, "productos": []}
+
+    files.sort(key=lambda x: x.lower())
+    items = []
+    for filename in files:
+        display_name = _humanize_producto_name(filename)
+        items.append({
+            "name": display_name,
+            "image": f"/productos/{quote(filename)}",
+            "description": f"Acabado {display_name}. Combina tu color seleccionado y configura terminacion, presentacion y cantidad.",
+        })
+
+    return {"total": len(items), "productos": items}
+
 @app.on_event("startup")
 async def startup_event():
     logger.info("Starting PaintFlow API...")
@@ -313,6 +365,18 @@ async def cliente_html():
     if os.path.exists(html_path):
         return FileResponse(html_path, media_type="text/html")
     raise HTTPException(status_code=404, detail="Cliente page not found")
+
+
+@app.get("/clientes")
+async def clientes_page():
+    """Alias plural hacia la ruta canonica de cliente."""
+    return RedirectResponse(url="/cliente", status_code=307)
+
+
+@app.get("/clientes.html")
+async def clientes_html():
+    """Alias plural HTML hacia la ruta canonica de cliente."""
+    return RedirectResponse(url="/cliente", status_code=307)
 
 
 def _normalize_sucursal_slug(text: str) -> str:
@@ -2428,7 +2492,7 @@ def get_departamento(rol):
         return "Departamento TI"
     elif rol and rol.lower() in ['gerente', 'contabilidad']:
         return "Finanzas"
-    elif rol and rol.lower() in ['facturador', 'cajero', 'colorista', 'analista']:
+    elif rol and rol.lower() in ['facturador', 'cajero', 'cliente', 'colorista', 'analista']:
         return "Tienda"
     return "Otros"
 
@@ -2953,7 +3017,7 @@ async def debug_empleados(db=Depends(get_db)):
         cur.execute("""
             SELECT id, nombre_completo, rol, sucursal_id, email
             FROM usuarios
-            WHERE rol IN ('colorista', 'facturador', 'encargado', 'operador', 'auxiliar_almacen', 'administrador', 'analista')
+            WHERE rol IN ('colorista', 'facturador', 'cliente', 'encargado', 'operador', 'auxiliar_almacen', 'administrador', 'analista')
             ORDER BY id
             LIMIT 50
         """)

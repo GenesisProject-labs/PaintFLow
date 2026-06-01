@@ -1041,9 +1041,9 @@ class SistemaLoginIntegrado:
                         return {"error": "Contraseña incorrecta"}
 
                     # Verificar que el rol sea apropiado para LabelsApp
-                    roles_permitidos = ['facturador', 'cajero', 'administrador']
+                    roles_permitidos = ['facturador', 'cajero', 'cliente', 'administrador']
                     if usuario[4] not in roles_permitidos:
-                        return {"error": f"Rol '{usuario[4]}' no tiene acceso a PaintFlow. Se requiere rol de cajero, facturador o administrador."}
+                        return {"error": f"Rol '{usuario[4]}' no tiene acceso a PaintFlow. Se requiere rol de cajero, cliente, facturador o administrador."}
 
                     # Actualizar ultimo_acceso
                     try:
