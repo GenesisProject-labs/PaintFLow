@@ -2139,8 +2139,8 @@
             <div class="form-group"><label>Sucursal</label><select id="inputSucursalUsuario"></select></div>
             <div class="form-group"><label>Telefono</label><input type="text" id="inputTelefonoUsuario"></div>
             <div class="modal-buttons">
-                <button class="btn-primary" onclick="guardarUsuario()">Guardar</button>
-                <button class="btn-secondary" onclick="cerrarModalUsuario()">Cancelar</button>
+                <button id="btnGuardarUsuario" class="btn-primary" onclick="guardarUsuario()">Guardar</button>
+                <button id="btnCancelarUsuario" class="btn-secondary" onclick="cerrarModalUsuario()">Cancelar</button>
                 <button id="btnToggleEstadoUsuario" class="btn-warning" onclick="toggleEstadoUsuarioModal()" style="display: none; background: #f57c00;">Inhabilitar Usuario</button>
             </div>
         </div>
@@ -4311,6 +4311,7 @@ function cerrarModalSucursal() {
 
 let allUsuarios = [];
 let editingUsuarioId = null;
+let guardandoUsuario = false;
 
 
 
@@ -4381,7 +4382,13 @@ async function editarUsuario(id) {
 }
 
 async function guardarUsuario() {
+    if (guardandoUsuario) return;
+
     clearModalError('modalUsuario');
+    const btnGuardar = document.getElementById("btnGuardarUsuario");
+    const btnCancelar = document.getElementById("btnCancelarUsuario");
+    const textoOriginalGuardar = btnGuardar ? btnGuardar.textContent : "Guardar";
+
     const usuario = document.getElementById("inputUsuario").value.trim();
     const nombre = document.getElementById("inputNombreUsuario").value.trim();
     const email = document.getElementById("inputEmailUsuario").value.trim();
@@ -4394,6 +4401,15 @@ async function guardarUsuario() {
         showModalError('modalUsuario', 'Usuario, Nombre, email y sucursal son requeridos');
         return;
     }
+
+    guardandoUsuario = true;
+    if (btnGuardar) {
+        btnGuardar.disabled = true;
+        btnGuardar.textContent = "Guardando...";
+        btnGuardar.style.opacity = "0.75";
+        btnGuardar.style.cursor = "wait";
+    }
+    if (btnCancelar) btnCancelar.disabled = true;
     
     try {
         let url;
@@ -4408,6 +4424,7 @@ async function guardarUsuario() {
         } else {
             url = API + "/api/v1/usuarios?nombre_completo=" + encodeURIComponent(nombre) + 
                   "&email=" + encodeURIComponent(email) + 
+                  "&username=" + encodeURIComponent(usuario) + 
                   "&rol=" + encodeURIComponent(rol) + 
                   "&sucursal_id=" + sucursal_id + 
                   "&telefono=" + encodeURIComponent(telefono);
@@ -4424,6 +4441,15 @@ async function guardarUsuario() {
         }
     } catch (e) {
         showModalError('modalUsuario', 'Error: ' + e.message);
+    } finally {
+        guardandoUsuario = false;
+        if (btnGuardar) {
+            btnGuardar.disabled = false;
+            btnGuardar.textContent = textoOriginalGuardar;
+            btnGuardar.style.opacity = "";
+            btnGuardar.style.cursor = "";
+        }
+        if (btnCancelar) btnCancelar.disabled = false;
     }
 }
 

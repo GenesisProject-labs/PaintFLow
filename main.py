@@ -2936,6 +2936,7 @@ async def create_usuario(nombre_completo: str, email: str, password: str = None,
             password = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
         
         # Construir username robusto: evita n/a y colisiones por duplicado.
+        username_was_provided = bool((username or "").strip())
         raw_username = (username or "").strip()
         if not raw_username:
             email_value = (email or "").strip()
@@ -2953,15 +2954,20 @@ async def create_usuario(nombre_completo: str, email: str, password: str = None,
         cur = db.cursor()
         _ensure_usuarios_cliente_role_constraint(db)
 
-        candidate = username
-        suffix = 1
-        while True:
-            cur.execute("SELECT 1 FROM usuarios WHERE LOWER(TRIM(username)) = LOWER(TRIM(%s)) LIMIT 1", (candidate,))
-            if not cur.fetchone():
-                username = candidate
-                break
-            suffix += 1
-            candidate = f"{username}_{suffix}"
+        if username_was_provided:
+            cur.execute("SELECT 1 FROM usuarios WHERE LOWER(TRIM(username)) = LOWER(TRIM(%s)) LIMIT 1", (username,))
+            if cur.fetchone():
+                raise HTTPException(status_code=409, detail="El usuario (login) ya existe")
+        else:
+            candidate = username
+            suffix = 1
+            while True:
+                cur.execute("SELECT 1 FROM usuarios WHERE LOWER(TRIM(username)) = LOWER(TRIM(%s)) LIMIT 1", (candidate,))
+                if not cur.fetchone():
+                    username = candidate
+                    break
+                suffix += 1
+                candidate = f"{username}_{suffix}"
         
         # Hash usando SHA256 (consistente con BD)
         password_hash = hashlib.sha256(password.encode()).hexdigest()
@@ -2973,6 +2979,8 @@ async def create_usuario(nombre_completo: str, email: str, password: str = None,
         usuario_id = cur.fetchone()[0]
         db.commit()
         return {"id": usuario_id, "nombre_completo": nombre_completo, "email": email, "rol": rol or "Empleado", "sucursal_id": sucursal_id, "username": username, "temporal_password": password, "estado": "activo"}
+    except HTTPException:
+        raise
     except Exception as e:
         try:
             db.rollback()
