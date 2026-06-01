@@ -1007,20 +1007,83 @@
             if (cacheKey && Array.isArray(state.sherwinSearchCache[cacheKey])) {
                 return state.sherwinSearchCache[cacheKey].map(item => ({ ...item }));
             }
+
+            const candidateQueries = [];
+            const seenQueries = new Set();
+            const addCandidate = (value) => {
+                const v = String(value || "").trim();
+                const k = normalizeText(v);
+                if (!v || !k || seenQueries.has(k)) return;
+                seenQueries.add(k);
+                candidateQueries.push(v);
+            };
+
+            addCandidate(normalizedQuery);
+            if (isSherwinCodeQuery(normalizedQuery)) {
+                const digits = extractSwCode(normalizedQuery);
+                if (digits) {
+                    addCandidate(`SW ${digits}`);
+                    addCandidate(`SW-${digits}`);
+                    addCandidate(digits);
+                }
+            }
+
+            const mergedByCode = new Map();
             try {
-                const params = new URLSearchParams();
-                params.set("query", normalizedQuery);
-                params.set("timeout_seconds", "10");
-                const res = await fetch(`${API}/api/v1/sherwin/search?${params.toString()}`);
-                if (!res.ok) return [];
-                const data = await res.json();
-                const results = Array.isArray(data.results) ? data.results : [];
-                const normalized = results.map(normalizeSherwinSearchItem).filter(Boolean);
+                for (const candidate of candidateQueries) {
+                    const params = new URLSearchParams();
+                    params.set("query", candidate);
+                    params.set("timeout_seconds", "10");
+                    const res = await fetch(`${API}/api/v1/sherwin/search?${params.toString()}`);
+                    if (!res.ok) continue;
+                    const data = await res.json();
+                    const results = Array.isArray(data.results) ? data.results : [];
+                    const normalized = results.map(normalizeSherwinSearchItem).filter(Boolean);
+                    for (const item of normalized) {
+                        const code = extractSwCode(item.codigo);
+                        if (!code) continue;
+                        if (!mergedByCode.has(code)) mergedByCode.set(code, item);
+                    }
+                }
+
+                let normalized = Array.from(mergedByCode.values());
+
+                // Fallback determinista: si Sherwin search no devolvio nada para SW numerico,
+                // pedir el swatch directo por codigo.
+                if (!normalized.length && isSherwinCodeQuery(normalizedQuery)) {
+                    const code = extractSwCode(normalizedQuery);
+                    if (code) {
+                        const params = new URLSearchParams();
+                        params.set("codes", code);
+                        params.set("timeout_seconds", "10");
+                        const swatchRes = await fetch(`${API}/api/v1/sherwin/swatches?${params.toString()}`);
+                        if (swatchRes.ok) {
+                            const swatchData = await swatchRes.json();
+                            const first = Array.isArray(swatchData.items) ? swatchData.items[0] : null;
+                            if (first && String(first.code || "").trim()) {
+                                normalized = [{
+                                    codigo: `SW ${code}`,
+                                    nombre: String(first.name || `SW ${code}`).trim(),
+                                    base: "",
+                                    ubicacion: "",
+                                    personalizado: false,
+                                    sherwin: true,
+                                    hex: normalizeHex(first.hex || ""),
+                                }];
+                            }
+                        }
+                    }
+                }
+
                 for (const item of normalized) {
                     const code = extractSwCode(item.codigo);
                     if (!code) continue;
-                    state.colorByCode[code] = { name: item.nombre || `SW ${code}`, hex: normalizeHex(item.hex || "") };
+                    state.colorByCode[code] = {
+                        name: item.nombre || `SW ${code}`,
+                        hex: normalizeHex(item.hex || "")
+                    };
                 }
+
                 if (cacheKey) {
                     state.sherwinSearchCache[cacheKey] = normalized.map(item => ({ ...item }));
                 }
