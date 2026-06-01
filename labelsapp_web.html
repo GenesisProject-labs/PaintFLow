@@ -1188,7 +1188,11 @@
             "hi-solids pt": ["Gloss", "Brillo"],
             "hi-solids 250": ["Gloss", "Brillo"],
             "armorseal rexthane": ["Gloss", "Brillo"],
-            "water-base catalyzed": ["Gloss", "Brillo"]
+            "industrial enamel": ["Gloss"],
+            "urethane alkyd": ["Gloss", "Eggshell"],
+            "water-base catalyzed": ["Gloss", "Brillo"],
+            "water-base pre catalyzed": ["Gloss"],
+            "kem kromik 150": ["Gloss"]
         };
 
         const PRODUCT_RULES = {
@@ -1269,6 +1273,9 @@
             "industrial enamel": {
                 presentaciones: ["Galon"]
             },
+            "kem kromik 150": {
+                presentaciones: ["Galon"]
+            },
             "kem aqua": {
                 presentaciones: ["Cuarto", "Galon", "Cubeta"]
             },
@@ -1323,6 +1330,9 @@
             },
             "water-base catalyzed": {
                 presentaciones: ["Galon"]
+            },
+            "water-base pre catalyzed": {
+                presentaciones: ["Galon"]
             }
         };
 
@@ -1369,8 +1379,10 @@
             "Sherplate 600",
             "Macropoxy 4600",
             "Industrial Enamel",
+            "KEM KROMIK 150",
             "SUPERPAINT A&P",
             "Urethane Alkyd",
+            "Water-Base Pre Catalyzed",
             "Water-Base Catalyzed"
         ];
 
@@ -1871,10 +1883,15 @@
             const baseNorm = normalize(base);
 
             let valid = [];
-            for (const [key, terminaciones] of Object.entries(TERMINACIONES_POR_PRODUCTO)) {
-                if (productNorm.includes(key)) {
-                    valid = terminaciones.slice();
-                    break;
+            const exact = TERMINACIONES_POR_PRODUCTO[productNorm];
+            if (Array.isArray(exact) && exact.length) {
+                valid = exact.slice();
+            } else {
+                const candidates = Object.keys(TERMINACIONES_POR_PRODUCTO)
+                    .filter(key => productNorm.includes(key))
+                    .sort((a, b) => b.length - a.length);
+                if (candidates.length) {
+                    valid = TERMINACIONES_POR_PRODUCTO[candidates[0]].slice();
                 }
             }
 
@@ -2405,10 +2422,28 @@
         async function refreshCodigoBase() {
             const base = document.getElementById("base").value.trim();
             const producto = document.getElementById("producto").value.trim();
-            const terminacion = document.getElementById("terminacion").value;
-            const presentacion = document.getElementById("presentacion").value;
+            const termEl = document.getElementById("terminacion");
+            const presEl = document.getElementById("presentacion");
+            let terminacion = termEl.value;
+            let presentacion = presEl.value;
             const codigoBaseEl = document.getElementById("codigoBase");
             const currentSeq = ++codigoBaseRequestSeq;
+
+            if (!terminacion) {
+                const validTerms = getValidTerminaciones(producto, base);
+                if (validTerms.length === 1) {
+                    termEl.value = validTerms[0];
+                    terminacion = validTerms[0];
+                }
+            }
+
+            if (!presentacion) {
+                const validPres = getValidPresentaciones(producto);
+                if (validPres.length === 1) {
+                    presEl.value = validPres[0];
+                    presentacion = validPres[0];
+                }
+            }
 
             const forcedByProduct = forcedCodeForProductName(producto);
             if (forcedByProduct) {
@@ -3234,6 +3269,12 @@
             } else {
                 refreshCodigoBase();
             }
+        });
+        document.getElementById("base").addEventListener("input", () => {
+            refreshCodigoBase();
+        });
+        document.getElementById("base").addEventListener("change", () => {
+            refreshCodigoBase();
         });
         document.getElementById("cantidad").addEventListener("input", () => {
             const cantidad = Math.max(1, Number(document.getElementById("cantidad").value || 1));

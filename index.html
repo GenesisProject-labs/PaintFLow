@@ -2239,6 +2239,17 @@ function isStoreRole(role) {
     return normalized === 'facturador' || normalized === 'cajero';
 }
 
+function isClientRole(role) {
+    return normalizeRole(role) === 'cliente';
+}
+
+function isKioskClientUser(userData) {
+    if (!userData || typeof userData !== 'object') return false;
+    const username = normalizeRole(userData.username);
+    const role = normalizeRole(userData.rol);
+    return username === 'cliente' || role === 'cliente';
+}
+
 // Verificar si hay sesión activa al cargar la página
 async function checkExistingSession() {
     if (sessionChecked) return;  // Already checked, skip
@@ -2273,6 +2284,12 @@ async function checkExistingSession() {
             // Verificar que el usuario tenga rol de administrador para esta vista
             const userData = JSON.parse(currentUser);
             const userRole = normalizeRole(userData.rol);
+
+            if (isKioskClientUser(userData)) {
+                console.log('Usuario cliente kiosko detectado, redirigiendo a /cliente');
+                window.location.href = '/cliente';
+                return;
+            }
             
             // Si es analista CON SESIÓN ACTIVA, redirigir a empleados
             if (userRole === 'analista') {
@@ -2285,6 +2302,12 @@ async function checkExistingSession() {
             if (isStoreRole(userRole)) {
                 console.log('Usuario de tienda detectado, redirigiendo a /labelsapp-web');
                 window.location.href = '/labelsapp-web';
+                return;
+            }
+
+            if (isClientRole(userRole)) {
+                console.log('Usuario cliente detectado, redirigiendo a /cliente');
+                window.location.href = '/cliente';
                 return;
             }
             
@@ -2340,6 +2363,12 @@ function goToDashboard() {
         // Verificar rol del usuario
         const userData = JSON.parse(localStorage.getItem('currentUser') || '{}');
     const rol = normalizeRole(userData.rol);
+
+        if (isKioskClientUser(userData)) {
+            console.log('Usuario cliente kiosko detectado, redirigiendo a /cliente');
+            window.location.href = '/cliente';
+            return;
+        }
         
         // Si es analista, redirigir a /employees en lugar del dashboard
         if (rol === 'analista') {
@@ -2352,6 +2381,12 @@ function goToDashboard() {
         if (isStoreRole(rol)) {
             console.log('Usuario de tienda detectado, redirigiendo a /labelsapp-web');
             window.location.href = '/labelsapp-web';
+            return;
+        }
+
+        if (isClientRole(rol)) {
+            console.log('Usuario cliente detectado, redirigiendo a /cliente');
+            window.location.href = '/cliente';
             return;
         }
         
@@ -2390,6 +2425,12 @@ async function handleLogin(e) {
         
         saveSession(usuarioData);
 
+        if (isKioskClientUser(usuarioData)) {
+            console.log('Usuario cliente kiosko detectado, redirigiendo a /cliente');
+            window.location.replace('/cliente');
+            return;
+        }
+
         const userRole = normalizeRole(usuarioData.rol);
 
         // Redirección por rol primero para evitar que cualquier lógica visual de admin se ejecute por error.
@@ -2402,6 +2443,12 @@ async function handleLogin(e) {
         if (isStoreRole(userRole)) {
             console.log('Usuario de tienda detectado, redirigiendo a /labelsapp-web');
             window.location.replace('/labelsapp-web');
+            return;
+        }
+
+        if (isClientRole(userRole)) {
+            console.log('Usuario cliente detectado, redirigiendo a /cliente');
+            window.location.replace('/cliente');
             return;
         }
 

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from fastapi import FastAPI, HTTPException, Depends, Request, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 import json
 import logging
@@ -12,8 +12,10 @@ import os
 import re
 import unicodedata
 from collections import defaultdict
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
+from urllib.parse import urlencode
+from urllib.request import Request as UrlRequest, urlopen
 
 class FormulaNormalCreate(BaseModel):
     codigo_color: str
@@ -91,6 +93,63 @@ class LabelsAppFacturaItemsUpdateRequest(BaseModel):
     id_cliente: Optional[str] = None
     items: List[LabelsAppItem]
 
+
+class SherwinLab(BaseModel):
+    L: float
+    A: float
+    B: float
+
+
+class SherwinCoordinatingColors(BaseModel):
+    coord1ColorId: str
+    coord2ColorId: str
+    whiteColorId: Optional[str] = None
+
+
+class SherwinColorResult(BaseModel):
+    colorNumber: str
+    coordinatingColors: Optional[SherwinCoordinatingColors] = None
+    description: List[str] = []
+    id: str
+    isExterior: bool
+    isInterior: bool
+    name: str
+    lrv: float
+    brandedCollectionNames: List[str] = []
+    colorFamilyNames: List[str] = []
+    brandKey: str
+    red: int
+    green: int
+    blue: int
+    hue: float
+    saturation: float
+    lightness: float
+    hex: str
+    isDark: bool
+    storeStripLocator: Optional[str] = None
+    similarColors: List[str] = []
+    ignore: bool
+    archived: bool
+    lab: SherwinLab
+
+
+class SherwinColorSearchResponse(BaseModel):
+    count: int
+    results: List[SherwinColorResult]
+
+
+class SherwinSwatchItem(BaseModel):
+    code: str
+    name: str
+    hex: str
+    found: bool
+    cached: bool
+
+
+class SherwinSwatchBatchResponse(BaseModel):
+    total: int
+    items: List[SherwinSwatchItem]
+
 from config import settings
 from database import DatabasePool, get_db
 import bcrypt
@@ -102,6 +161,8 @@ logger = logging.getLogger(__name__)
 
 # Sesiones activas: {usuario_id: {"username": "", "nombre": "", "rol": "", "departamento": "", "ultima_actividad": timestamp}}
 ACTIVE_SESSIONS = {}
+SHERWIN_SWATCH_CACHE: Dict[str, Dict[str, Any]] = {}
+SHERWIN_SWATCH_CACHE_TTL_SECONDS = 3600
 
 app = FastAPI(title=settings.API_TITLE, version=settings.API_VERSION, description="API PaintFlow")
 
@@ -222,6 +283,36 @@ async def labelsapp_feedback_page():
     if os.path.exists(html_path):
         return FileResponse(html_path, media_type="text/html")
     raise HTTPException(status_code=404, detail="LabelsApp Feedback page not found")
+
+
+@app.get("/kiosk-touch")
+async def kiosk_touch_page():
+    """Alias legacy: redirige a la ruta canonica de clientes."""
+    return RedirectResponse(url="/cliente", status_code=307)
+
+
+@app.get("/kiosk-touch.html")
+async def kiosk_touch_html():
+    """Alias legacy HTML: redirige a la ruta canonica de clientes."""
+    return RedirectResponse(url="/cliente", status_code=307)
+
+
+@app.get("/cliente")
+async def cliente_page():
+    """Alias comercial para la vista touch de clientes"""
+    html_path = os.path.join(os.path.dirname(__file__), "kiosk_touch.html")
+    if os.path.exists(html_path):
+        return FileResponse(html_path, media_type="text/html")
+    raise HTTPException(status_code=404, detail="Cliente page not found")
+
+
+@app.get("/cliente.html")
+async def cliente_html():
+    """Alias HTML para la vista de clientes"""
+    html_path = os.path.join(os.path.dirname(__file__), "kiosk_touch.html")
+    if os.path.exists(html_path):
+        return FileResponse(html_path, media_type="text/html")
+    raise HTTPException(status_code=404, detail="Cliente page not found")
 
 
 def _normalize_sucursal_slug(text: str) -> str:
@@ -670,6 +761,25 @@ def _calculate_codigo_base(db, base: str, producto: str, terminacion: str) -> st
     }
     term_canon = term_alias.get(term, term)
 
+    # Overrides de negocio solicitados: deben ganar a reglas antiguas en BD.
+    if "industrial enamel" in prod and term_canon in ("brillo", "gloss"):
+        if base_norm == "extra white":
+            return "B54W101-"
+        if base_norm == "ultra deep":
+            return "B54T104-"
+
+    if (("water-base pre catalyzed" in prod) or ("water base pre catalyzed" in prod)) and term_canon in ("brillo", "gloss"):
+        if base_norm == "extra white":
+            return "K45W01151-"
+        if base_norm == "ultra deep":
+            return "K45T02154-"
+
+    if "kem kromik 150" in prod and term_canon in ("brillo", "gloss"):
+        if base_norm == "extra white":
+            return "N41W651-"
+        if base_norm == "ultra deep":
+            return "N41T654-"
+
     def _expand_template(template: str, row_map: dict) -> str:
         def repl(match):
             token = (match.group(1) or "").strip().lower()
@@ -822,6 +932,8 @@ def _calculate_codigo_base(db, base: str, producto: str, terminacion: str) -> st
         es_scufftuff = "scuff tuff-wb" in prod
         es_UrethaneAlkyd = "urethane alkyd" in prod
         es_industrialenamels = "industrial enamel" in prod
+        es_waterbase_precat = ("water-base pre catalyzed" in prod) or ("water base pre catalyzed" in prod)
+        es_kem_kromik_150 = "kem kromik 150" in prod
         es_macropoxy646 = "macropoxy 646" in prod
         es_sherplate600 = "sherplate 600" in prod
         es_macropoxy4600 = "macropoxy 4600" in prod
@@ -865,6 +977,8 @@ def _calculate_codigo_base(db, base: str, producto: str, terminacion: str) -> st
                     'es_scufftuff': es_scufftuff,
                     'es_UrethaneAlkyd': es_UrethaneAlkyd,
                     'es_industrialenamels': es_industrialenamels,
+                    'es_waterbase_precat': es_waterbase_precat,
+                    'es_kem_kromik_150': es_kem_kromik_150,
                     'es_hcheavyshield': es_hcheavyshield,
                     'es_ProMarEgShel': es_ProMarEgShel,
                     'es_ProMarEgShel400': es_ProMarEgShel400,
@@ -1080,7 +1194,7 @@ def _calculate_codigo_base(db, base: str, producto: str, terminacion: str) -> st
             return "No Aplica"
 
         if es_UrethaneAlkyd:
-            if term_cmp == "brillo":
+            if term_cmp in ("brillo", "gloss", "eggshell"):
                 if base_color == "extra white":
                     return "B54W00151-"
                 if base_color == "ultra deep":
@@ -1088,11 +1202,27 @@ def _calculate_codigo_base(db, base: str, producto: str, terminacion: str) -> st
             return "No Aplica"
 
         if es_industrialenamels:
-            if term_cmp == "brillo":
+            if term_cmp in ("brillo", "gloss"):
                 if base_color == "extra white":
                     return "B54W101-"
                 if base_color == "ultra deep":
-                    return "B54T101-"
+                    return "B54T104-"
+            return "No Aplica"
+
+        if es_waterbase_precat:
+            if term_cmp in ("brillo", "gloss"):
+                if base_color == "extra white":
+                    return "K45W01151-"
+                if base_color == "ultra deep":
+                    return "K45T02154-"
+            return "No Aplica"
+
+        if es_kem_kromik_150:
+            if term_cmp in ("brillo", "gloss"):
+                if base_color == "extra white":
+                    return "N41W651-"
+                if base_color == "ultra deep":
+                    return "N41T654-"
             return "No Aplica"
 
         if es_hcheavyshield:
@@ -1396,6 +1526,290 @@ async def labelsapp_product_by_code(
     except Exception as e:
         logger.error(f"Error getting labelsapp product: {e}")
         raise HTTPException(status_code=500, detail="Error obteniendo producto")
+
+
+def _to_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "si", "y"}
+    return False
+
+
+def _to_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except Exception:
+        return default
+
+
+def _to_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(float(value))
+    except Exception:
+        return default
+
+
+def _normalize_sherwin_result(item: Dict[str, Any]) -> Dict[str, Any]:
+    descriptions = item.get("description")
+    if isinstance(descriptions, str):
+        descriptions = [descriptions]
+    elif not isinstance(descriptions, list):
+        descriptions = []
+
+    similar_colors = item.get("similarColors")
+    if isinstance(similar_colors, str):
+        similar_colors = [similar_colors]
+    elif not isinstance(similar_colors, list):
+        similar_colors = []
+
+    branded_collections = item.get("brandedCollectionNames")
+    if isinstance(branded_collections, str):
+        branded_collections = [branded_collections]
+    elif not isinstance(branded_collections, list):
+        branded_collections = []
+
+    family_names = item.get("colorFamilyNames")
+    if isinstance(family_names, str):
+        family_names = [family_names]
+    elif not isinstance(family_names, list):
+        family_names = []
+
+    lab = item.get("lab") if isinstance(item.get("lab"), dict) else {}
+    coord = item.get("coordinatingColors") if isinstance(item.get("coordinatingColors"), dict) else None
+
+    normalized = {
+        "colorNumber": str(item.get("colorNumber") or ""),
+        "description": [str(x) for x in descriptions],
+        "id": str(item.get("id") or ""),
+        "isExterior": _to_bool(item.get("isExterior")),
+        "isInterior": _to_bool(item.get("isInterior")),
+        "name": str(item.get("name") or ""),
+        "lrv": _to_float(item.get("lrv"), 0.0),
+        "brandedCollectionNames": [str(x) for x in branded_collections],
+        "colorFamilyNames": [str(x) for x in family_names],
+        "brandKey": str(item.get("brandKey") or ""),
+        "red": _to_int(item.get("red"), 0),
+        "green": _to_int(item.get("green"), 0),
+        "blue": _to_int(item.get("blue"), 0),
+        "hue": _to_float(item.get("hue"), 0.0),
+        "saturation": _to_float(item.get("saturation"), 0.0),
+        "lightness": _to_float(item.get("lightness"), 0.0),
+        "hex": str(item.get("hex") or ""),
+        "isDark": _to_bool(item.get("isDark")),
+        "storeStripLocator": (str(item.get("storeStripLocator")) if item.get("storeStripLocator") is not None else None),
+        "similarColors": [str(x) for x in similar_colors],
+        "ignore": _to_bool(item.get("ignore")),
+        "archived": _to_bool(item.get("archived")),
+        "lab": {
+            "L": _to_float(lab.get("L"), 0.0),
+            "A": _to_float(lab.get("A"), 0.0),
+            "B": _to_float(lab.get("B"), 0.0),
+        },
+    }
+
+    if coord:
+        normalized["coordinatingColors"] = {
+            "coord1ColorId": str(coord.get("coord1ColorId") or ""),
+            "coord2ColorId": str(coord.get("coord2ColorId") or ""),
+            "whiteColorId": (str(coord.get("whiteColorId")) if coord.get("whiteColorId") is not None else None),
+        }
+
+    return normalized
+
+
+def _pick_best_sherwin_result(results: List[Dict[str, Any]], sw_code: str) -> Optional[Dict[str, Any]]:
+    if not results:
+        return None
+    compact = (sw_code or "").replace("SW", "").strip().upper()
+    exact = next((r for r in results if str(r.get("colorNumber") or "").replace(" ", "").upper() == compact), None)
+    if exact:
+        return exact
+    ends = next((r for r in results if str(r.get("colorNumber") or "").replace(" ", "").upper().endswith(compact)), None)
+    if ends:
+        return ends
+    return results[0]
+
+
+def _cached_sherwin_swatch_get(sw_code: str) -> Optional[Dict[str, Any]]:
+    key = (sw_code or "").strip().upper()
+    if not key:
+        return None
+    entry = SHERWIN_SWATCH_CACHE.get(key)
+    if not entry:
+        return None
+    if (time.time() - float(entry.get("ts") or 0)) > SHERWIN_SWATCH_CACHE_TTL_SECONDS:
+        SHERWIN_SWATCH_CACHE.pop(key, None)
+        return None
+    return entry
+
+
+def _cached_sherwin_swatch_set(sw_code: str, name: str, hex_value: str, found: bool) -> None:
+    key = (sw_code or "").strip().upper()
+    if not key:
+        return
+    SHERWIN_SWATCH_CACHE[key] = {
+        "ts": time.time(),
+        "name": (name or "").strip() or f"SW {key}",
+        "hex": (hex_value or "").strip(),
+        "found": bool(found),
+    }
+
+
+def _fetch_sherwin_swatch(sw_code: str, lng: str = "en-US", corev: str = "7.16.0", timeout_seconds: int = 8) -> Dict[str, Any]:
+    code = re.sub(r"[^0-9A-Z]", "", str(sw_code or "").upper().replace("SW", "").strip())
+    if not code:
+        return {"code": "", "name": "", "hex": "", "found": False, "cached": False}
+
+    cached = _cached_sherwin_swatch_get(code)
+    if cached:
+        return {
+            "code": code,
+            "name": str(cached.get("name") or f"SW {code}"),
+            "hex": str(cached.get("hex") or ""),
+            "found": bool(cached.get("found")),
+            "cached": True,
+        }
+
+    params = {
+        "query": code,
+        "lng": lng or "en-US",
+        "_corev": corev or "7.16.0",
+    }
+    upstream_url = f"https://api.sherwin-williams.com/prism/v1/search/sherwin?{urlencode(params)}"
+    req = UrlRequest(
+        upstream_url,
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "PaintFlow/1.0",
+        },
+        method="GET",
+    )
+
+    with urlopen(req, timeout=max(3, min(int(timeout_seconds or 8), 20))) as resp:
+        body = resp.read().decode("utf-8", errors="replace")
+
+    raw = json.loads(body or "{}")
+    raw_results = raw.get("results") if isinstance(raw, dict) else []
+    raw_results = raw_results if isinstance(raw_results, list) else []
+
+    normalized_results: List[Dict[str, Any]] = []
+    for item in raw_results:
+        if not isinstance(item, dict):
+            continue
+        try:
+            normalized_results.append(_normalize_sherwin_result(item))
+        except Exception:
+            continue
+
+    best = _pick_best_sherwin_result(normalized_results, code)
+    if not best:
+        _cached_sherwin_swatch_set(code, f"SW {code}", "", False)
+        return {"code": code, "name": f"SW {code}", "hex": "", "found": False, "cached": False}
+
+    name = str(best.get("name") or f"SW {code}")
+    hex_value = str(best.get("hex") or "").strip()
+    _cached_sherwin_swatch_set(code, name, hex_value, True)
+    return {"code": code, "name": name, "hex": hex_value, "found": True, "cached": False}
+
+
+@app.get("/api/v1/sherwin/search", response_model=SherwinColorSearchResponse)
+async def sherwin_color_search(
+    query: str,
+    lng: str = "en-US",
+    corev: str = "7.16.0",
+    timeout_seconds: int = 12,
+):
+    """Proxy tipado para busqueda de colores Sherwin en Prism."""
+    query = (query or "").strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="query es requerido")
+
+    timeout_seconds = max(3, min(int(timeout_seconds or 12), 25))
+
+    params = {
+        "query": query,
+        "lng": lng or "en-US",
+        "_corev": corev or "7.16.0",
+    }
+    upstream_url = f"https://api.sherwin-williams.com/prism/v1/search/sherwin?{urlencode(params)}"
+
+    req = UrlRequest(
+        upstream_url,
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "PaintFlow/1.0",
+        },
+        method="GET",
+    )
+
+    try:
+        with urlopen(req, timeout=timeout_seconds) as resp:
+            status_code = int(getattr(resp, "status", 200) or 200)
+            body = resp.read().decode("utf-8", errors="replace")
+
+        if status_code >= 400:
+            raise HTTPException(status_code=502, detail="Sherwin API devolvio error")
+
+        raw = json.loads(body or "{}")
+        raw_results = raw.get("results") if isinstance(raw, dict) else []
+        if not isinstance(raw_results, list):
+            raw_results = []
+
+        typed_results = []
+        for item in raw_results:
+            if not isinstance(item, dict):
+                continue
+            try:
+                typed_results.append(SherwinColorResult(**_normalize_sherwin_result(item)))
+            except Exception:
+                continue
+
+        return SherwinColorSearchResponse(
+            count=_to_int(raw.get("count") if isinstance(raw, dict) else len(typed_results), len(typed_results)),
+            results=typed_results,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error querying Sherwin Prism API: {e}")
+        raise HTTPException(status_code=502, detail="No se pudo consultar Sherwin API")
+
+
+@app.get("/api/v1/sherwin/swatches", response_model=SherwinSwatchBatchResponse)
+async def sherwin_swatches(
+    codes: str,
+    lng: str = "en-US",
+    corev: str = "7.16.0",
+    timeout_seconds: int = 8,
+):
+    """Obtiene muestras de color (nombre + hex) para varios codigos SW."""
+    parts = [p.strip() for p in (codes or "").split(",") if p.strip()]
+    if not parts:
+        raise HTTPException(status_code=400, detail="codes es requerido")
+
+    clean_codes = []
+    seen = set()
+    for raw in parts:
+        compact = re.sub(r"[^0-9A-Z]", "", raw.upper().replace("SW", "").strip())
+        if not compact or compact in seen:
+            continue
+        seen.add(compact)
+        clean_codes.append(compact)
+        if len(clean_codes) >= 40:
+            break
+
+    items: List[SherwinSwatchItem] = []
+    for code in clean_codes:
+        try:
+            data = _fetch_sherwin_swatch(code, lng=lng, corev=corev, timeout_seconds=timeout_seconds)
+            items.append(SherwinSwatchItem(**data))
+        except Exception:
+            items.append(SherwinSwatchItem(code=code, name=f"SW {code}", hex="", found=False, cached=False))
+
+    return SherwinSwatchBatchResponse(total=len(items), items=items)
 
 
 @app.get("/api/v1/labelsapp/personalizados")
@@ -2050,7 +2464,7 @@ async def login(username: str, password: str, db=Depends(get_db)):
             raise HTTPException(status_code=403, detail="Esta cuenta está inactiva")
         
         # Verificar que tenga un rol permitido en el portal
-        allowed_roles = ['administrador', 'analista', 'facturador', 'cajero']
+        allowed_roles = ['administrador', 'analista', 'facturador', 'cajero', 'cliente']
         if not rol_normalizado or rol_normalizado not in allowed_roles:
             raise HTTPException(status_code=403, detail="Acceso restringido para este rol")
         
