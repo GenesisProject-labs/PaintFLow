@@ -1390,6 +1390,19 @@
             ensureSherwinColors(visibleColors).then(() => renderColors());
         }
 
+        async function applyFilterWithSherwinFallback(query) {
+            applyLocalColorFilter(query);
+            const trimmed = String(query || "").trim();
+            if (!trimmed || state.colors.length) return;
+
+            const sherwinResults = await searchSherwinColors(trimmed);
+            if (sherwinResults.length) {
+                state.colors = sherwinResults;
+                renderColors();
+                setStatus("Colores cargados desde Sherwin", "ok");
+            }
+        }
+
         function renderSelectedColorStrip() {
             const root = document.getElementById("selectedColorStrip");
             if (!root) return;
@@ -1695,10 +1708,7 @@
             };
 
             if (state.allColors.length) {
-                applyLocalColorFilter(query);
-                if (query && !state.colors.length) {
-                    await applySherwinFallback();
-                }
+                await applyFilterWithSherwinFallback(query);
                 return;
             }
 
@@ -1848,7 +1858,7 @@
 
             debounceTimer = setTimeout(() => {
                 if (state.allColors.length) {
-                    applyLocalColorFilter(value);
+                    applyFilterWithSherwinFallback(value);
                 } else {
                     loadColorList();
                 }
