@@ -1376,7 +1376,13 @@
                     <div class="dashboard-inline-panel">
                         <div class="labels-toolbar">
                             <h3 style="margin: 0;">Métricas Generales PaintFlow por Zonas</h3>
-                            <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                                <span style="font-size: 0.85rem; color: #4f6f90; font-weight: 600;">Desde:</span>
+                                <input id="labelsDateFromAnalyst" type="date" onchange="onAnalystDateInputChange()" style="padding: 4px 6px; border: 1px solid #d5deea; border-radius: 8px;" />
+                                <span style="font-size: 0.85rem; color: #4f6f90; font-weight: 600;">Hasta:</span>
+                                <input id="labelsDateToAnalyst" type="date" onchange="onAnalystDateInputChange()" style="padding: 4px 6px; border: 1px solid #d5deea; border-radius: 8px;" />
+                                <button type="button" onclick="applyAnalystDateFilter()" style="padding: 5px 10px; border: 1px solid #1a73e8; background: #1a73e8; color: #fff; border-radius: 8px; cursor: pointer; font-weight: 700;">Aplicar</button>
+                                <button type="button" onclick="clearAnalystDateFilter()" style="padding: 5px 10px; border: 1px solid #d5deea; background: #fff; color: #325172; border-radius: 8px; cursor: pointer; font-weight: 700;">Limpiar</button>
                                 <span style="font-size: 0.85rem; color: #4f6f90; font-weight: 600;">Vista:</span>
                                 <select id="labelsZonaSelector" onchange="updateAnalystZoneView()">
                                     <option value="ALL">Todas las Zonas</option>
@@ -1565,6 +1571,8 @@
         let analystCurrentZona = 'ALL';
         let analystMetricsInFlight = null;
         let analystLastFetchMs = 0;
+        let analystDateFrom = '';
+        let analystDateTo = '';
 
         const ANALYST_ZONAS = {
             Santo_Domingo: ['Tiradentes', 'Luperon', 'Churchill', 'Bella Vista', 'Zona Oriental', 'Arroyo Hondo', 'San Isidro', 'Villa Mella', 'Alameda', 'San Martin'],
@@ -2119,7 +2127,10 @@
             renderAnalystCharts(analystMetricsCache, selectedZona);
 
             if (status && String(status.textContent || '').startsWith('Actualizado')) {
-                status.textContent = `Actualizado (${selectedZona === 'ALL' ? 'Todas las Zonas' : zoneKeyToLabel(selectedZona)}): ${new Date().toLocaleTimeString('es-DO')}`;
+                const period = (analystDateFrom || analystDateTo)
+                    ? ` (${analystDateFrom || '...'} a ${analystDateTo || '...'})`
+                    : '';
+                status.textContent = `Actualizado${period} (${selectedZona === 'ALL' ? 'Todas las Zonas' : zoneKeyToLabel(selectedZona)}): ${new Date().toLocaleTimeString('es-DO')}`;
             }
         }
 
@@ -2183,7 +2194,8 @@
 
             analystMetricsInFlight = (async () => {
             try {
-                const res = await fetchWithTimeout(API + '/api/v1/labelsapp/usage-metrics?product_limit=5', 10000);
+                const query = getAnalystDateQueryParams();
+                const res = await fetchWithTimeout(API + `/api/v1/labelsapp/usage-metrics?${query.toString()}`, 10000);
                 if (!res.ok) throw new Error('No se pudo cargar dashboard de analista');
                 const data = await res.json();
                 analystMetricsCache = data;
@@ -2191,7 +2203,10 @@
                 analystLastFetchMs = Date.now();
                 renderAnalystDashboard(data);
                 if ((!silent || isAnalystDashboardOpen()) && status) {
-                    status.textContent = `Actualizado: ${new Date().toLocaleTimeString('es-DO')}`;
+                    const period = (analystDateFrom || analystDateTo)
+                        ? ` (${analystDateFrom || '...'} a ${analystDateTo || '...'})`
+                        : '';
+                    status.textContent = `Actualizado${period}: ${new Date().toLocaleTimeString('es-DO')}`;
                 }
             } catch (err) {
                 try {
@@ -2225,6 +2240,42 @@
                 .trim();
         }
 
+        function getAnalystDateFilterKey() {
+            return `${analystDateFrom || ''}|${analystDateTo || ''}`;
+        }
+
+        function getAnalystDateQueryParams() {
+            const params = new URLSearchParams();
+            params.set('product_limit', '5');
+            if (analystDateFrom) params.set('date_from', analystDateFrom);
+            if (analystDateTo) params.set('date_to', analystDateTo);
+            return params;
+        }
+
+        function onAnalystDateInputChange() {
+            const fromInput = document.getElementById('labelsDateFromAnalyst');
+            const toInput = document.getElementById('labelsDateToAnalyst');
+            analystDateFrom = fromInput ? (fromInput.value || '') : '';
+            analystDateTo = toInput ? (toInput.value || '') : '';
+        }
+
+        function applyAnalystDateFilter() {
+            onAnalystDateInputChange();
+            analystMetricsCache = null;
+            loadAnalystDashboardData({ force: true });
+        }
+
+        function clearAnalystDateFilter() {
+            const fromInput = document.getElementById('labelsDateFromAnalyst');
+            const toInput = document.getElementById('labelsDateToAnalyst');
+            if (fromInput) fromInput.value = '';
+            if (toInput) toInput.value = '';
+            analystDateFrom = '';
+            analystDateTo = '';
+            analystMetricsCache = null;
+            loadAnalystDashboardData({ force: true });
+        }
+
         function normalizeSucursalSlug(text) {
             return normalizeTextBasic(text)
                 .replace(/[^a-z0-9]+/g, '_')
@@ -2244,6 +2295,7 @@
                 if (!raw) return null;
                 const parsed = JSON.parse(raw);
                 if (!parsed || !parsed.data || !parsed.ts) return null;
+                if ((parsed.filterKey || '') !== getAnalystDateFilterKey()) return null;
                 const ageMs = Date.now() - Number(parsed.ts || 0);
                 if (ageMs > 120000) return null;
                 return parsed.data;
@@ -2254,7 +2306,11 @@
 
         function setCachedAnalystMetrics(data) {
             try {
-                localStorage.setItem('analyst_metrics_cache_v2', JSON.stringify({ ts: Date.now(), data }));
+                localStorage.setItem('analyst_metrics_cache_v2', JSON.stringify({
+                    ts: Date.now(),
+                    filterKey: getAnalystDateFilterKey(),
+                    data
+                }));
             } catch (_) {}
         }
 

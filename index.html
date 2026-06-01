@@ -1900,7 +1900,13 @@
                 <div class="dashboard-card" style="padding: 20px; min-height: 300px; display: flex; flex-direction: column; margin-top: 20px;">
                     <div class="labels-toolbar">
                         <h3 style="margin: 0;">Métricas Generales LabelsApp por Zonas</h3>
-                        <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                            <span style="font-size: 0.85rem; color: #4f6f90; font-weight: 600;">Desde:</span>
+                            <input id="labelsDateFrom" type="date" onchange="onLabelsDateInputChange()" style="padding: 4px 6px; border: 1px solid #d5deea; border-radius: 8px;" />
+                            <span style="font-size: 0.85rem; color: #4f6f90; font-weight: 600;">Hasta:</span>
+                            <input id="labelsDateTo" type="date" onchange="onLabelsDateInputChange()" style="padding: 4px 6px; border: 1px solid #d5deea; border-radius: 8px;" />
+                            <button type="button" onclick="applyLabelsDateFilter()" style="padding: 5px 10px; border: 1px solid #1a73e8; background: #1a73e8; color: #fff; border-radius: 8px; cursor: pointer; font-weight: 700;">Aplicar</button>
+                            <button type="button" onclick="clearLabelsDateFilter()" style="padding: 5px 10px; border: 1px solid #d5deea; background: #fff; color: #325172; border-radius: 8px; cursor: pointer; font-weight: 700;">Limpiar</button>
                             <span style="font-size: 0.85rem; color: #4f6f90; font-weight: 600;">Vista:</span>
                             <select id="labelsZonaSelector" onchange="updateLabelsZoneView()">
                                 <option value="ALL">Todas las Zonas</option>
@@ -2835,6 +2841,8 @@ let labelsCompletionByZoneChart = null;
 let labelsMetricsCache = null;
 let labelsMetricsLoading = false;
 let labelsLastRenderSignature = '';
+let labelsDateFrom = '';
+let labelsDateTo = '';
 
 // Función para actualizar gráficas del dashboard
 function updateDashboardCharts() {
@@ -2857,6 +2865,44 @@ function normalizeTextBasic(text) {
         .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase()
         .trim();
+}
+
+function getLabelsDateFilterKey() {
+    return `${labelsDateFrom || ''}|${labelsDateTo || ''}`;
+}
+
+function getLabelsDateQueryParams() {
+    const params = new URLSearchParams();
+    params.set('product_limit', '5');
+    if (labelsDateFrom) params.set('date_from', labelsDateFrom);
+    if (labelsDateTo) params.set('date_to', labelsDateTo);
+    return params;
+}
+
+function onLabelsDateInputChange() {
+    const fromInput = document.getElementById('labelsDateFrom');
+    const toInput = document.getElementById('labelsDateTo');
+    labelsDateFrom = fromInput ? (fromInput.value || '') : '';
+    labelsDateTo = toInput ? (toInput.value || '') : '';
+}
+
+function applyLabelsDateFilter() {
+    onLabelsDateInputChange();
+    labelsMetricsCache = null;
+    labelsLastRenderSignature = '';
+    updateLabelsAppUsageMetrics();
+}
+
+function clearLabelsDateFilter() {
+    const fromInput = document.getElementById('labelsDateFrom');
+    const toInput = document.getElementById('labelsDateTo');
+    if (fromInput) fromInput.value = '';
+    if (toInput) toInput.value = '';
+    labelsDateFrom = '';
+    labelsDateTo = '';
+    labelsMetricsCache = null;
+    labelsLastRenderSignature = '';
+    updateLabelsAppUsageMetrics();
 }
 
 function normalizeSucursalSlug(text) {
@@ -3119,7 +3165,10 @@ function renderSucursalLoginByZoneTable(data, selectedZona) {
 function renderLabelsCharts(data, selectedZona) {
     if (typeof Chart === 'undefined') return;
 
-    const zonaRows = getZonaUsageRows(data);
+    const allZonaRows = getZonaUsageRows(data);
+    const zonaRows = selectedZona === 'ALL'
+        ? allZonaRows
+        : allZonaRows.filter(z => z.zona === selectedZona);
     const zonaCanvas = document.getElementById('labelsZonaUsageChart');
     if (zonaCanvas) {
         if (labelsZonaUsageChart) labelsZonaUsageChart.destroy();
@@ -3154,7 +3203,12 @@ function renderLabelsCharts(data, selectedZona) {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: { display: true, position: 'bottom' },
-                    title: { display: true, text: 'Vista General por Zonas' }
+                    title: {
+                        display: true,
+                        text: selectedZona === 'ALL'
+                            ? 'Vista General por Zonas'
+                            : `Vista por Zona: ${zoneKeyToLabel(selectedZona)}`
+                    }
                 },
                 scales: {
                     y: { beginAtZero: true, title: { display: true, text: 'Facturas' } },
@@ -3220,7 +3274,7 @@ function renderLabelsCharts(data, selectedZona) {
             zona: toSubtabZoneKey(z.zona),
             avg_completion_minutes: Number(z.avg_completion_minutes || 0),
             ordenes_finalizadas: Number(z.ordenes_finalizadas || 0)
-        }));
+        })).filter(z => selectedZona === 'ALL' || z.zona === selectedZona);
 
         if (labelsCompletionByZoneChart) labelsCompletionByZoneChart.destroy();
         labelsCompletionByZoneChart = new Chart(completionCanvas, {
@@ -3253,7 +3307,12 @@ function renderLabelsCharts(data, selectedZona) {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: { position: 'bottom' },
-                    title: { display: true, text: 'Tiempo Promedio de Finalización por Zona' }
+                    title: {
+                        display: true,
+                        text: selectedZona === 'ALL'
+                            ? 'Tiempo Promedio de Finalización por Zona'
+                            : `Tiempo Promedio de Finalización (${zoneKeyToLabel(selectedZona)})`
+                    }
                 },
                 scales: {
                     y: { beginAtZero: true, title: { display: true, text: 'Minutos' } },
@@ -3322,6 +3381,7 @@ function getCachedLabelsMetrics() {
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         if (!parsed || !parsed.data || !parsed.ts) return null;
+        if ((parsed.filterKey || '') !== getLabelsDateFilterKey()) return null;
         const ageMs = Date.now() - Number(parsed.ts || 0);
         if (ageMs > 120000) return null;
         return parsed.data;
@@ -3332,7 +3392,11 @@ function getCachedLabelsMetrics() {
 
 function setCachedLabelsMetrics(data) {
     try {
-        localStorage.setItem('labels_metrics_cache_v1', JSON.stringify({ ts: Date.now(), data }));
+        localStorage.setItem('labels_metrics_cache_v1', JSON.stringify({
+            ts: Date.now(),
+            filterKey: getLabelsDateFilterKey(),
+            data
+        }));
     } catch (_) {}
 }
 
@@ -3437,7 +3501,8 @@ async function updateLabelsAppUsageMetrics() {
             statusEl.textContent = 'Cargando métricas...';
         }
 
-        const res = await fetchWithTimeout(API + '/api/v1/labelsapp/usage-metrics?product_limit=5', 5000);
+        const query = getLabelsDateQueryParams();
+        const res = await fetchWithTimeout(API + `/api/v1/labelsapp/usage-metrics?${query.toString()}`, 7000);
         if (!res.ok) {
             let detail = '';
             try {
@@ -3469,7 +3534,10 @@ async function updateLabelsAppUsageMetrics() {
         updateLabelsZoneSelector(data);
         updateLabelsZoneView();
 
-        if (statusEl) statusEl.textContent = `Actualizado: ${new Date().toLocaleTimeString('es-DO')}`;
+        const period = (labelsDateFrom || labelsDateTo)
+            ? ` (${labelsDateFrom || '...'} a ${labelsDateTo || '...'})`
+            : '';
+        if (statusEl) statusEl.textContent = `Actualizado${period}: ${new Date().toLocaleTimeString('es-DO')}`;
     } catch (e) {
         console.error('Error metrics labelsapp:', e);
         try {

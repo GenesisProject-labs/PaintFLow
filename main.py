@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 import csv
 import time
 import os
@@ -2891,10 +2891,30 @@ async def get_login_activity(limit: int = 50, db=Depends(get_db)):
 
 
 @app.get("/api/v1/labelsapp/usage-metrics")
-async def labelsapp_usage_metrics(product_limit: int = 5, db=Depends(get_db)):
+async def labelsapp_usage_metrics(
+    product_limit: int = 5,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    db=Depends(get_db)
+):
     """Resumen de uso de LabelsApp para dashboard administrativo."""
     try:
         safe_limit = max(3, min(int(product_limit or 5), 20))
+        from_dt = None
+        to_dt_exclusive = None
+        if date_from:
+            try:
+                from_dt = datetime.strptime(date_from, "%Y-%m-%d")
+            except ValueError:
+                raise HTTPException(status_code=400, detail="date_from debe tener formato YYYY-MM-DD")
+        if date_to:
+            try:
+                to_dt_exclusive = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="date_to debe tener formato YYYY-MM-DD")
+        if from_dt and to_dt_exclusive and from_dt >= to_dt_exclusive:
+            raise HTTPException(status_code=400, detail="Rango inválido: date_from debe ser menor o igual que date_to")
+
         cur = db.cursor()
 
         cur.execute(
@@ -2933,10 +2953,25 @@ async def labelsapp_usage_metrics(product_limit: int = 5, db=Depends(get_db)):
             factura_col = "id_factura" if "id_factura" in table_columns else None
             cantidad_col = "cantidad" if "cantidad" in table_columns else None
             producto_col = "producto" if "producto" in table_columns else None
+            date_col = "fecha_creacion" if "fecha_creacion" in table_columns else None
             if not factura_col and "factura" in table_columns:
                 factura_col = "factura"
             if not producto_col and "nombre_producto" in table_columns:
                 producto_col = "nombre_producto"
+
+            if (from_dt or to_dt_exclusive) and not date_col:
+                # Si no hay columna de fecha, no se puede filtrar por rango en esta tabla.
+                continue
+
+            date_clauses = []
+            date_params = []
+            if from_dt:
+                date_clauses.append(f"{date_col} >= %s")
+                date_params.append(from_dt)
+            if to_dt_exclusive:
+                date_clauses.append(f"{date_col} < %s")
+                date_params.append(to_dt_exclusive)
+            where_date_sql = f"WHERE {' AND '.join(date_clauses)}" if date_clauses else ""
 
             facturas_expr = (
                 f"COUNT(DISTINCT NULLIF(TRIM(COALESCE({factura_col}::text, '')), ''))"
@@ -2954,7 +2989,9 @@ async def labelsapp_usage_metrics(product_limit: int = 5, db=Depends(get_db)):
                 SELECT {facturas_expr} AS facturas,
                        {items_expr} AS items
                 FROM {table_name}
-                """
+                {where_date_sql}
+                """,
+                tuple(date_params)
             )
             facts_row = cur.fetchone() or (0, 0)
             facturas_count = int(facts_row[0] or 0)
@@ -2980,8 +3017,10 @@ async def labelsapp_usage_metrics(product_limit: int = 5, db=Depends(get_db)):
                            {product_qty_expr} AS qty
                     FROM {table_name}
                     WHERE TRIM(COALESCE({producto_col}::text, '')) <> ''
+                    {'AND ' + ' AND '.join(date_clauses) if date_clauses else ''}
                     GROUP BY TRIM(COALESCE({producto_col}::text, ''))
-                    """
+                    """,
+                    tuple(date_params)
                 )
                 for producto, qty in cur.fetchall() or []:
                     product_name = (producto or "").strip()
@@ -2992,16 +3031,27 @@ async def labelsapp_usage_metrics(product_limit: int = 5, db=Depends(get_db)):
                     product_totals_by_sucursal[sucursal_slug][product_name] += qty_i
 
             if "fecha_creacion" in table_columns and "fecha_completado" in table_columns:
+                completion_clauses = [
+                    "fecha_creacion IS NOT NULL",
+                    "fecha_completado IS NOT NULL",
+                    "TRIM(COALESCE(estado, '')) IN ('Finalizado', 'Completado')",
+                ]
+                completion_params = []
+                if from_dt:
+                    completion_clauses.append("fecha_completado >= %s")
+                    completion_params.append(from_dt)
+                if to_dt_exclusive:
+                    completion_clauses.append("fecha_completado < %s")
+                    completion_params.append(to_dt_exclusive)
                 cur.execute(
                     f"""
                     SELECT
                         COALESCE(SUM(EXTRACT(EPOCH FROM (fecha_completado - fecha_creacion)) / 60.0), 0) AS total_min,
                         COUNT(*) AS cnt
                     FROM {table_name}
-                    WHERE fecha_creacion IS NOT NULL
-                      AND fecha_completado IS NOT NULL
-                      AND TRIM(COALESCE(estado, '')) IN ('Finalizado', 'Completado')
-                    """
+                    WHERE {' AND '.join(completion_clauses)}
+                    """,
+                    tuple(completion_params)
                 )
                 comp_row = cur.fetchone() or (0, 0)
                 completion_by_sucursal[sucursal_slug]["total_min"] += float(comp_row[0] or 0)
@@ -3187,6 +3237,10 @@ async def labelsapp_usage_metrics(product_limit: int = 5, db=Depends(get_db)):
             "sucursal_menos_uso": sucursal_usage[-1] if sucursal_usage else None,
             "zona_mas_uso": zona_usage[0] if zona_usage else None,
             "zona_menos_uso": zona_usage[-1] if zona_usage else None,
+            "filters": {
+                "date_from": date_from or "",
+                "date_to": date_to or "",
+            },
         }
     except Exception as e:
         logger.error(f"Error getting labelsapp usage metrics: {e}")
