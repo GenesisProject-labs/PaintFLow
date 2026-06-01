@@ -12,7 +12,17 @@ def check_formula_tables():
         db = DatabasePool.get_connection()
         cur = db.cursor()
         
-        tables = ['presentacion', 'formulas_cce_g', 'formulas_cce_c', 'formulas_cce_qt', 'colorante']
+        tables = [
+            'presentacion',
+            'formulas_cce_g',
+            'formulas_cce_c',
+            'formulas_cce_qt',
+            'formulas_bacc_g',
+            'formulas_bacc_c',
+            'formulas_bacc_qt',
+            'formulas_backup',
+            'colorante',
+        ]
         
         for table in tables:
             print(f"\n📋 TABLA: {table}")

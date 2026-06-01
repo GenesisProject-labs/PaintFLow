@@ -83,6 +83,17 @@ class LabelsAppSendRequest(BaseModel):
     items: List[LabelsAppItem]
 
 
+FORMULA_SOURCE_TABLES = [
+    "presentacion",
+    "formulas_cce_g",
+    "formulas_cce_c",
+    "formulas_cce_qt",
+    "formulas_bacc_g",
+    "formulas_bacc_c",
+    "formulas_bacc_qt",
+]
+
+
 class LabelsAppCodigoBaseRequest(BaseModel):
     base: str
     producto: str
@@ -275,6 +286,7 @@ async def startup_event():
         try:
             _ensure_labelsapp_history_table(db)
             _ensure_usuarios_cliente_role_constraint(db)
+            _ensure_formula_backup(db)
             db.commit()
         finally:
             DatabasePool.return_connection(db)
@@ -3924,6 +3936,74 @@ async def list_colorantes(skip: int = 0, limit: int = 200, db=Depends(get_db)):
     except Exception as e:
         logger.error(f"Error listing colorantes: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _ensure_formula_backup(db) -> None:
+    cur = db.cursor()
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS formulas_backup (
+            id BIGSERIAL PRIMARY KEY,
+            source_table VARCHAR(80) NOT NULL,
+            source_key VARCHAR(160),
+            operation VARCHAR(10) NOT NULL,
+            row_data JSONB NOT NULL,
+            changed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_formulas_backup_changed_at ON formulas_backup(changed_at DESC)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_formulas_backup_source_table ON formulas_backup(source_table, changed_at DESC)")
+    cur.execute(
+        """
+        CREATE OR REPLACE FUNCTION fn_formulas_backup() RETURNS trigger AS $$
+        DECLARE
+            payload jsonb;
+            source_key_value text;
+        BEGIN
+            IF TG_OP = 'DELETE' THEN
+                payload := to_jsonb(OLD);
+            ELSE
+                payload := to_jsonb(NEW);
+            END IF;
+
+            source_key_value := COALESCE(
+                payload ->> 'id',
+                NULLIF(TRIM(COALESCE(payload ->> 'id_pintura', '') || '|' || COALESCE(payload ->> 'id_colorante', '')), '|')
+            );
+
+            INSERT INTO formulas_backup(source_table, source_key, operation, row_data, changed_at)
+            VALUES (TG_TABLE_NAME, source_key_value, TG_OP, payload, CURRENT_TIMESTAMP);
+
+            IF TG_OP = 'DELETE' THEN
+                RETURN OLD;
+            END IF;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        """
+    )
+
+    for table_name in FORMULA_SOURCE_TABLES:
+        cur.execute(
+            """
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name = %s
+            """,
+            (table_name,)
+        )
+        if not cur.fetchone():
+            continue
+        trigger_name = f"trg_{table_name}_formula_backup"
+        cur.execute(f"DROP TRIGGER IF EXISTS {trigger_name} ON {table_name}")
+        cur.execute(
+            f"""
+            CREATE TRIGGER {trigger_name}
+            AFTER INSERT OR UPDATE OR DELETE ON {table_name}
+            FOR EACH ROW EXECUTE FUNCTION fn_formulas_backup()
+            """
+        )
 
 @app.get("/api/v1/formulas-normales")
 async def list_formulas_normales(request: Request, codigo: str = None, tipo: str = "galon", skip: int = 0, limit: int = 100, db=Depends(get_db)):
