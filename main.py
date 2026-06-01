@@ -8,6 +8,8 @@ import logging
 from datetime import datetime, timedelta
 import csv
 import time
+import random
+import string
 import os
 import re
 import unicodedata
@@ -2933,12 +2935,33 @@ async def create_usuario(nombre_completo: str, email: str, password: str = None,
         if not password:
             password = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
         
-        # Usar username si se proporciona, si no generarlo del email
-        if not username:
-            username = email.split('@')[0] if email else f"user_{sucursal_id}"
+        # Construir username robusto: evita n/a y colisiones por duplicado.
+        raw_username = (username or "").strip()
+        if not raw_username:
+            email_value = (email or "").strip()
+            if email_value and "@" in email_value and email_value.lower() not in {"n/a", "na", "none", "null"}:
+                raw_username = email_value.split("@")[0]
+            elif nombre_completo:
+                raw_username = re.sub(r"[^a-z0-9]+", "_", unicodedata.normalize("NFKD", nombre_completo).encode("ascii", "ignore").decode("ascii").lower()).strip("_")
+            else:
+                raw_username = f"user_{sucursal_id or 'x'}"
+
+        username = re.sub(r"[^a-zA-Z0-9._-]+", "_", raw_username).strip("._-")
+        if not username or username.lower() in {"n/a", "na", "none", "null", "n_a"}:
+            username = f"user_{int(time.time())}"
         
         cur = db.cursor()
         _ensure_usuarios_cliente_role_constraint(db)
+
+        candidate = username
+        suffix = 1
+        while True:
+            cur.execute("SELECT 1 FROM usuarios WHERE LOWER(TRIM(username)) = LOWER(TRIM(%s)) LIMIT 1", (candidate,))
+            if not cur.fetchone():
+                username = candidate
+                break
+            suffix += 1
+            candidate = f"{username}_{suffix}"
         
         # Hash usando SHA256 (consistente con BD)
         password_hash = hashlib.sha256(password.encode()).hexdigest()
