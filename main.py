@@ -266,8 +266,8 @@ async def productos_catalog():
 @app.on_event("startup")
 async def startup_event():
     logger.info("Starting PaintFlow API...")
+    DatabasePool.init_pool()
     try:
-        DatabasePool.init_pool()
         db = DatabasePool.get_connection()
         try:
             _ensure_labelsapp_history_table(db)
@@ -276,7 +276,7 @@ async def startup_event():
         finally:
             DatabasePool.return_connection(db)
     except Exception as e:
-        logger.warning(f"Could not initialize DB on startup (will retry on first request): {e}")
+        logger.warning(f"Could not ensure labelsapp history table on startup: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -4133,4 +4133,5 @@ async def delete_formula_cce(request: Request, formula_id: int, tipo: str = "gal
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8002)
+    port = int(os.getenv("PORT", "8002"))
+    uvicorn.run(app, host="0.0.0.0", port=port)
