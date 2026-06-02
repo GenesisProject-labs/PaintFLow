@@ -484,6 +484,22 @@
             box-shadow: 0 -2px 0 #fff, 0 10px 18px rgba(16, 62, 117, 0.06);
         }
 
+        .tab-badge {
+            margin-left: 6px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            height: 20px;
+            border-radius: 999px;
+            padding: 0 6px;
+            background: #0d47a1;
+            color: #fff;
+            font-size: 0.75rem;
+            line-height: 1;
+            font-weight: 700;
+        }
+
         .labelsapp-subtab-content {
             display: none;
         }
@@ -912,6 +928,7 @@
             <div class="labelsapp-subtabs">
                 <button class="labelsapp-subtab-btn active" type="button" data-labelsapp-tab="queue" onclick="switchLabelsAppTab(event, 'queue')">Cola actual</button>
                 <button class="labelsapp-subtab-btn" type="button" data-labelsapp-tab="hold" onclick="switchLabelsAppTab(event, 'hold')">En espera</button>
+                <button class="labelsapp-subtab-btn" type="button" data-labelsapp-tab="clients" onclick="switchLabelsAppTab(event, 'clients')">Clientes/Kiosko <span id="kioskInboxBadge" class="tab-badge">0</span></button>
                 <button class="labelsapp-subtab-btn" type="button" data-labelsapp-tab="live" onclick="switchLabelsAppTab(event, 'live')">Tiempo real</button>
                 <button class="labelsapp-subtab-btn" type="button" data-labelsapp-tab="history" onclick="switchLabelsAppTab(event, 'history')">Historial</button>
             </div>
@@ -983,6 +1000,27 @@
                             </tr>
                         </thead>
                         <tbody id="heldListsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="labelsappClientsTab" class="labelsapp-subtab-content">
+                <div class="card-body queue-tab-shell">
+                    <div class="summary">Pedidos enviados desde cliente/kiosko. Carga aquí lo que quieres pasar a Cola actual.</div>
+                    <div id="kioskInboxSummary" class="summary">Nuevos: 0 · En cola: 0</div>
+                </div>
+                <div class="queue-wrap live-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Cliente / Factura</th>
+                                <th>Items</th>
+                                <th>Enviado</th>
+                                <th>Estado</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="kioskInboxBody"></tbody>
                     </table>
                 </div>
             </div>
@@ -1126,6 +1164,7 @@
         const queue = [];
         const liveQueue = [];
         const pendingQueue = [];
+        const kioskInbox = [];
         const customProducts = [];
         const heldLists = [];
         let historyEntries = [];
@@ -1141,6 +1180,10 @@
         let liveEventSource = null;
         let liveQueueLoading = false;
         let pendingQueueLoading = false;
+        let kioskInboxLoading = false;
+        let kioskInboxInitialized = false;
+        let kioskNewCount = 0;
+        let kioskSeenFacturas = new Set();
         let labelsAppTab = "queue";
         let productTab = "capture";
         let editingQueueIndex = -1;
@@ -2974,7 +3017,7 @@
 
         function openLiveEventStream() {
             const user = ensureSession();
-            if (!user || labelsAppTab !== "live") return;
+            if (!user || !["live", "hold", "clients"].includes(labelsAppTab)) return;
             if (liveEventSource) return;
 
             try {
@@ -2989,6 +3032,8 @@
                         loadLiveQueue();
                     } else if (labelsAppTab === "hold") {
                         loadPendingQueue();
+                    } else if (labelsAppTab === "clients") {
+                        loadKioskInbox();
                     }
                 });
                 source.addEventListener("ping", () => {});
@@ -3035,6 +3080,103 @@
             `).join("");
         }
 
+        function isKioskHistoryEntry(entry) {
+            const factura = String(entry?.id_factura || entry?.factura || "").toUpperCase();
+            const operador = String(entry?.operador || "").toLowerCase();
+            const username = String(entry?.username || "").toLowerCase();
+            const origen = String(entry?.origen || "").toLowerCase();
+            if (factura.startsWith("CLI-") || factura.startsWith("KIOSK-") || factura.startsWith("BORRADOR-")) return true;
+            if (operador.includes("kiosk")) return true;
+            if (username === "cliente") return true;
+            return origen === "kiosk";
+        }
+
+        function updateKioskInboxBadge() {
+            const badge = document.getElementById("kioskInboxBadge");
+            if (!badge) return;
+            const total = kioskInbox.length;
+            badge.textContent = kioskNewCount > 0 ? `${kioskNewCount}/${total}` : String(total);
+        }
+
+        function renderKioskInbox() {
+            const body = document.getElementById("kioskInboxBody");
+            const summary = document.getElementById("kioskInboxSummary");
+            if (summary) {
+                summary.textContent = `${kioskInbox.length} recibido(s) · ${queue.length} en cola actual` + (kioskNewCount > 0 ? ` · ${kioskNewCount} nuevo(s)` : "");
+            }
+            updateKioskInboxBadge();
+            if (!body) return;
+
+            if (!kioskInbox.length) {
+                body.innerHTML = `<tr><td colspan="5" class="empty">No hay envíos de cliente/kiosko por ahora</td></tr>`;
+                return;
+            }
+
+            body.innerHTML = kioskInbox.map((entry) => `
+                <tr>
+                    <td>${escapeHtml(entry.id_factura || entry.factura || "-")}</td>
+                    <td>${escapeHtml(entry.id_cliente || "-")}</td>
+                    <td>${Number(entry.total_items || entry.inserted || (entry.productos || entry.items || []).length || 0)}</td>
+                    <td>${escapeHtml(new Date(entry.fecha_envio || Date.now()).toLocaleString())}</td>
+                    <td>
+                        <button class="btn btn-link" onclick="loadHistoryEntry('${entry.id}')">Cargar a cola actual</button>
+                    </td>
+                </tr>
+            `).join("");
+        }
+
+        async function loadKioskInbox() {
+            if (kioskInboxLoading) return;
+            kioskInboxLoading = true;
+            try {
+                const params = new URLSearchParams({ limit: "200" });
+                const user = ensureSession();
+                if (user?.username) params.set("username", user.username);
+                if (user?.id) params.set("usuario_id", String(user.id));
+                if (user?.rol) params.set("role", user.rol);
+                if (user?.rol && ["administrador", "admin", "manager", "gerente"].includes(String(user.rol).toLowerCase())) {
+                    params.delete("sucursal");
+                } else if (user?.sucursal || user?.sucursal_nombre) {
+                    params.set("sucursal", user.sucursal || user.sucursal_nombre);
+                }
+
+                const res = await fetch(`${API}/api/v1/labelsapp/history?${params.toString()}`);
+                if (!res.ok) throw new Error("No se pudo cargar buzón kiosko");
+                const data = await res.json();
+                const incoming = (Array.isArray(data.items) ? data.items : []).filter(isKioskHistoryEntry);
+
+                const uniqueByFactura = new Map();
+                for (const entry of incoming) {
+                    const key = String(entry.id_factura || entry.factura || "").trim();
+                    if (!key || uniqueByFactura.has(key)) continue;
+                    uniqueByFactura.set(key, entry);
+                }
+
+                const currentFacturas = new Set(Array.from(uniqueByFactura.keys()));
+                if (kioskInboxInitialized) {
+                    let arrivals = 0;
+                    for (const factura of currentFacturas) {
+                        if (!kioskSeenFacturas.has(factura)) arrivals += 1;
+                    }
+                    kioskNewCount = arrivals;
+                } else {
+                    kioskNewCount = 0;
+                    kioskInboxInitialized = true;
+                }
+
+                kioskSeenFacturas = currentFacturas;
+                kioskInbox.length = 0;
+                for (const entry of uniqueByFactura.values()) kioskInbox.push(entry);
+                renderKioskInbox();
+            } catch (_) {
+                kioskInbox.length = 0;
+                kioskNewCount = 0;
+                renderKioskInbox();
+            } finally {
+                kioskInboxLoading = false;
+            }
+        }
+
         function clearHistoryFilters() {
             const searchEl = document.getElementById("historySearch");
             const fromEl = document.getElementById("historyDateFrom");
@@ -3045,6 +3187,7 @@
             if (fromEl) fromEl.value = dateKey;
             if (toEl) toEl.value = dateKey;
             refreshHistory();
+            loadKioskInbox();
         }
 
         async function updateLivePriority(factura, prioridad) {
@@ -3141,6 +3284,8 @@
                         loadLiveQueue();
                     } else if (labelsAppTab === "hold") {
                         loadPendingQueue();
+                    } else if (labelsAppTab === "clients") {
+                        loadKioskInbox();
                     }
                 }, 4000);
                 openLiveEventStream();
@@ -3150,7 +3295,7 @@
         }
 
         function switchLabelsAppTab(evt, tabName) {
-            labelsAppTab = ["queue", "hold", "live", "history"].includes(tabName) ? tabName : "queue";
+            labelsAppTab = ["queue", "hold", "clients", "live", "history"].includes(tabName) ? tabName : "queue";
 
             document.querySelectorAll("[data-labelsapp-tab]").forEach((btn) => {
                 btn.classList.toggle("active", btn.getAttribute("data-labelsapp-tab") === labelsAppTab);
@@ -3158,19 +3303,25 @@
 
             const queueTab = document.getElementById("labelsappQueueTab");
             const holdTab = document.getElementById("labelsappHoldTab");
+            const clientsTab = document.getElementById("labelsappClientsTab");
             const liveTab = document.getElementById("labelsappLiveTab");
             const historyTab = document.getElementById("labelsappHistoryTab");
             if (queueTab) queueTab.classList.toggle("active", labelsAppTab === "queue");
             if (holdTab) holdTab.classList.toggle("active", labelsAppTab === "hold");
+            if (clientsTab) clientsTab.classList.toggle("active", labelsAppTab === "clients");
             if (liveTab) liveTab.classList.toggle("active", labelsAppTab === "live");
             if (historyTab) historyTab.classList.toggle("active", labelsAppTab === "history");
 
-            setLivePolling(labelsAppTab === "live" || labelsAppTab === "hold");
+            setLivePolling(labelsAppTab === "live" || labelsAppTab === "hold" || labelsAppTab === "clients");
             if (labelsAppTab === "live") {
                 loadLiveQueue();
             }
             if (labelsAppTab === "hold") {
                 loadPendingQueue();
+            }
+            if (labelsAppTab === "clients") {
+                kioskNewCount = 0;
+                loadKioskInbox();
             }
             if (labelsAppTab === "history") {
                 renderHistory();
@@ -3267,6 +3418,7 @@
                     await loadLiveQueue();
                 }
                 await refreshHistory();
+                await loadKioskInbox();
             } catch (err) {
                 setStatus(err.message || "Error enviando lote", "error");
             }
@@ -3503,6 +3655,7 @@
             setSelectOptions("presentacion", DEFAULT_PRESENTACIONES);
             renderQueue();
             renderHeldLists();
+            renderKioskInbox();
             clearHistoryFilters();
             switchLabelsAppTab(null, "queue");
             switchProductTab(null, "capture");
@@ -3515,8 +3668,10 @@
             refreshCustomProducts();
 
             document.addEventListener("visibilitychange", () => {
-                if (!document.hidden && labelsAppTab === "live") {
-                    loadLiveQueue();
+                if (!document.hidden) {
+                    if (labelsAppTab === "live") loadLiveQueue();
+                    if (labelsAppTab === "hold") loadPendingQueue();
+                    if (labelsAppTab === "clients") loadKioskInbox();
                 }
             });
 
