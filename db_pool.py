@@ -37,7 +37,7 @@ class ConnectionPool:
 
     def __init__(self) -> None:
         min_conn = max(1, int(settings.DB_POOL_MIN))
-        max_conn = max(min_conn, int(settings.DB_POOL_MAX), 200)
+        max_conn = max(min_conn, int(settings.DB_POOL_MAX))
         self.pool = psycopg2.pool.ThreadedConnectionPool(
             minconn=min_conn,
             maxconn=max_conn,

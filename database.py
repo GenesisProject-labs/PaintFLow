@@ -33,7 +33,7 @@ class DatabasePool:
                     return
 
                 min_conn = max(1, int(settings.DB_POOL_MIN))
-                max_conn = max(min_conn, int(settings.DB_POOL_MAX), 200)
+                max_conn = max(min_conn, int(settings.DB_POOL_MAX))
 
                 cls._pool = psycopg2.pool.ThreadedConnectionPool(
                     min_conn,
@@ -56,6 +56,21 @@ class DatabasePool:
         except Exception as e:
             logger.error(f"❌ Error initializing DatabasePool: {e}")
             raise
+
+    @classmethod
+    def _reinitialize_pool(cls):
+        """Recrear pool para recuperarse de reinicios/failover del servidor."""
+        with cls._lock:
+            try:
+                if cls._pool is not None:
+                    cls._pool.closeall()
+            except Exception:
+                pass
+            finally:
+                cls._pool = None
+                cls._active_connections = 0
+
+        cls.init_pool()
     
     @classmethod
     def get_connection(cls):
@@ -65,13 +80,42 @@ class DatabasePool:
 
         retries = max(0, int(settings.DB_POOL_GET_RETRIES))
         backoff = max(0.05, float(settings.DB_POOL_GET_BACKOFF_SEC))
+        last_error = None
 
         for attempt in range(retries + 1):
+            conn = None
             try:
                 conn = cls._pool.getconn()
+
+                # Validar conexión: puede venir rota tras "terminating connection due to administrator command".
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1")
+
                 with cls._lock:
                     cls._active_connections += 1
                 return conn
+            except (psycopg2.OperationalError, psycopg2.InterfaceError, psycopg2.DatabaseError) as e:
+                last_error = e
+                try:
+                    if conn is not None and cls._pool is not None:
+                        cls._pool.putconn(conn, close=True)
+                except Exception:
+                    try:
+                        if conn is not None:
+                            conn.close()
+                    except Exception:
+                        pass
+
+                if attempt >= retries:
+                    break
+
+                logger.warning("Database connection invalid, rebuilding pool and retrying...")
+                try:
+                    cls._reinitialize_pool()
+                except Exception:
+                    pass
+
+                time.sleep(backoff * (attempt + 1))
             except psycopg2.pool.PoolError:
                 if attempt >= retries:
                     break
@@ -79,6 +123,8 @@ class DatabasePool:
 
         with cls._lock:
             active = cls._active_connections
+        if last_error is not None:
+            raise RuntimeError(f"Database unavailable after retries (active={active}): {last_error}")
         raise RuntimeError(f"Database pool exhausted (active={active})")
     
     @classmethod
