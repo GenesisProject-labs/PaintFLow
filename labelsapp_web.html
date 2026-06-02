@@ -1001,7 +1001,7 @@
                         <button class="btn btn-link" onclick="copyQueueCodigos()">Copiar Codigos</button>
                         <button class="btn btn-link" onclick="holdQueue()">Dejar en Espera</button>
                         <button class="btn btn-danger" onclick="clearQueue()">Limpiar</button>
-                        <button class="btn btn-primary" onclick="sendQueue()">Enviar A Cola</button>
+                        <button class="btn btn-primary" onclick="sendQueue()">Enviar</button>
                     </div>
                 </div>
             </div>
@@ -2192,8 +2192,9 @@
                 const dedupeCodeAndName = new Set();
 
                 for (const p of (data.productos || [])) {
-                    const originalName = (p.nombre || "").toString();
-                    const displayName = displayProductName(originalName);
+                    const descriptionName = (p.nombre || "").toString().trim();
+                    const productNameRaw = (p.producto || "").toString().trim();
+                    const displayProduct = displayProductName(productNameRaw);
 
                     const code = (p.codigo || "").toString().trim();
 
@@ -2202,21 +2203,24 @@
                     const normalizedProduct = {
                         ...p,
                         codigo: code,
-                        nombre: displayName
+                        nombre: descriptionName,
+                        producto: displayProduct || productNameRaw || ""
                     };
 
                     productByCode.set(code, normalizedProduct);
-                    productNames.add(displayName);
+                    if (displayProduct) {
+                        productNames.add(displayProduct);
+                    }
 
-                    const dedupeKey = `${normalize(code)}|${normalize(displayName)}`;
+                    const dedupeKey = `${normalize(code)}|${normalize(descriptionName)}`;
                     if (dedupeCodeAndName.has(dedupeKey)) continue;
                     dedupeCodeAndName.add(dedupeKey);
 
                     codeIndex.push({
                         code,
                         codeNorm: normalize(code),
-                        name: displayName,
-                        nameNorm: normalize(displayName),
+                        name: descriptionName,
+                        nameNorm: normalize(descriptionName),
                     });
 
                 }
@@ -2455,11 +2459,14 @@
                     const code = (p.codigo || "").toString();
                     if (!code) continue;
 
-                    const displayName = displayProductName(p.nombre || "");
+                    const descriptionName = (p.nombre || "").toString().trim();
+                    const productNameRaw = (p.producto || "").toString().trim();
+                    const displayProduct = displayProductName(productNameRaw);
                     const normalizedProduct = {
                         ...p,
                         codigo: code,
-                        nombre: displayName
+                        nombre: descriptionName,
+                        producto: displayProduct || productNameRaw || ""
                     };
 
                     productByCode.set(code, normalizedProduct);
@@ -2467,8 +2474,14 @@
                         codeIndex.push({
                             code,
                             codeNorm: normalize(code),
-                            name: displayName,
-                            nameNorm: normalize(displayName),
+                            name: descriptionName,
+                            nameNorm: normalize(descriptionName),
+                        });
+                    }
+                    if (displayProduct && !productIndex.some(x => x.norm === normalize(displayProduct))) {
+                        productIndex.push({
+                            name: displayProduct,
+                            norm: normalize(displayProduct),
                         });
                     }
                 }
@@ -2594,6 +2607,7 @@
             }
 
             document.getElementById("descripcion").value = product.nombre || "";
+            document.getElementById("producto").value = displayProductName(product.producto || "");
             document.getElementById("base").value = product.base || "";
             document.getElementById("ubicacion").value = product.ubicacion || "";
 
@@ -3490,6 +3504,7 @@
                     username: user.username,
                     usuario_id: user.id,
                     sucursal: user.sucursal || user.sucursal_nombre || "",
+                    operador: "labelsapp_web",
                     items: queue.map((item) => ({
                         ...item,
                         prioridad: item.prioridad || prioridad

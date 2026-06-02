@@ -2208,6 +2208,8 @@ async def labelsapp_send(payload: LabelsAppSendRequest, db=Depends(get_db)):
         inserted = 0
         cur = db.cursor()
         operador_label = _resolve_operador_label(db, username=payload.username, usuario_id=payload.usuario_id, operador=payload.operador)
+        operador_hint = ((payload.operador or operador_label or "").strip().lower())
+        estado_inicial = "Pendiente" if operador_hint in {"kiosk_touch", "kiosk", "cliente"} else "En Proceso"
 
         for idx, item in enumerate(payload.items):
             cantidad = max(1, int(item.cantidad or 1))
@@ -2226,7 +2228,7 @@ async def labelsapp_send(payload: LabelsAppSendRequest, db=Depends(get_db)):
                 "presentacion": item.presentacion,
                 "cantidad": cantidad,
                 "prioridad": item_priority,
-                "estado": "Pendiente",
+                "estado": estado_inicial,
                 "base": item.base,
                 "ubicacion": item.ubicacion,
                 "sucursal": sucursal_slug,
