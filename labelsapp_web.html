@@ -3109,7 +3109,7 @@
 
         function openLiveEventStream() {
             const user = ensureSession();
-            if (!user || !["live", "hold", "clients"].includes(labelsAppTab)) return;
+            if (!user || labelsAppTab !== "live") return;
             if (liveEventSource) return;
 
             try {
@@ -3440,7 +3440,7 @@
             if (liveTab) liveTab.classList.toggle("active", labelsAppTab === "live");
             if (historyTab) historyTab.classList.toggle("active", labelsAppTab === "history");
 
-            setLivePolling(labelsAppTab === "live" || labelsAppTab === "hold" || labelsAppTab === "clients");
+            setLivePolling(labelsAppTab === "live");
             if (labelsAppTab === "live") {
                 loadLiveQueue();
             }
