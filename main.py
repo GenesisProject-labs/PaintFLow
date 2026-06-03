@@ -2833,6 +2833,74 @@ async def labelsapp_history(
         raise HTTPException(status_code=500, detail="Error obteniendo historial de LabelsApp")
 
 
+@app.patch("/api/v1/labelsapp/history/{history_id}/transfer")
+async def labelsapp_mark_history_transfer(
+    history_id: int,
+    username: Optional[str] = None,
+    usuario_id: Optional[int] = None,
+    sucursal: Optional[str] = None,
+    role: Optional[str] = None,
+    db=Depends(get_db),
+):
+    """Marcar un registro de historial como transferido desde Clientes/Kiosko."""
+    try:
+        _ensure_labelsapp_history_table(db)
+        cur = db.cursor()
+
+        requester_role = _resolve_requester_role(db, username=username, usuario_id=usuario_id, role=role)
+        can_view_all = _can_view_all_labelsapp_history(requester_role)
+
+        params = [int(history_id)]
+        where_extra = ""
+        if not can_view_all:
+            requester_sucursal = _resolve_sucursal_slug(db, username=username, usuario_id=usuario_id, sucursal_text=sucursal)
+            where_extra = " AND TRIM(COALESCE(sucursal, '')) = TRIM(COALESCE(%s, ''))"
+            params.append(requester_sucursal)
+
+        cur.execute(
+            f"""
+            UPDATE labelsapp_historial
+            SET estado_envio = 'Transferido'
+            WHERE id = %s
+              AND (
+                          UPPER(COALESCE(id_factura, '')) LIKE 'CLI-%%'
+                      OR UPPER(COALESCE(id_factura, '')) LIKE 'KIOSK-%%'
+                 OR LOWER(COALESCE(origen, '')) = 'kiosk'
+                      OR LOWER(COALESCE(operador, '')) LIKE '%%kiosk%%'
+              )
+              {where_extra}
+            RETURNING id, id_factura, sucursal
+            """,
+            params,
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Registro de kiosko no encontrado")
+
+        # Defensive parsing: some deployments may return fewer columns than expected.
+        row_id = row[0] if len(row) > 0 else int(history_id)
+        row_factura = row[1] if len(row) > 1 else None
+        row_sucursal = row[2] if len(row) > 2 else None
+
+        db.commit()
+        return {
+            "ok": True,
+            "id": row_id,
+            "id_factura": row_factura,
+            "sucursal": row_sucursal,
+            "estado_envio": "Transferido",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.exception(f"Error marking kiosk transfer history row {history_id}: {e}")
+        raise HTTPException(status_code=500, detail="Error marcando pedido como transferido")
+
+
 async def _labelsapp_live_events_stream(username: Optional[str], usuario_id: Optional[int], sucursal: Optional[str]):
     db = DatabasePool.get_connection()
     try:
