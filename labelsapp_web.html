@@ -1675,12 +1675,44 @@
             return true;
         }
 
-        function transferKioskEntry(id) {
+        async function markKioskEntryTransferred(entry) {
+            const user = ensureSession();
+            if (!user || !entry?.id) return false;
+
+            const params = new URLSearchParams();
+            if (user.username) params.set("username", user.username);
+            if (user.id) params.set("usuario_id", String(user.id));
+            if (user.rol) params.set("role", user.rol);
+            if (user.sucursal || user.sucursal_nombre) params.set("sucursal", user.sucursal || user.sucursal_nombre);
+
+            const res = await fetch(`${API}/api/v1/labelsapp/history/${encodeURIComponent(entry.id)}/transfer?${params.toString()}`, {
+                method: "PATCH"
+            });
+            if (!res.ok) {
+                let message = "No se pudo marcar como transferido";
+                try {
+                    const payload = await res.json();
+                    if (payload?.detail) message = payload.detail;
+                } catch {
+                    // Ignore JSON parse errors.
+                }
+                throw new Error(message);
+            }
+            return true;
+        }
+
+        async function transferKioskEntry(id) {
             const entry = getHistoryEntryById(id);
             if (!entry) return;
 
             const loaded = loadHistoryEntry(id);
             if (!loaded) return;
+
+            try {
+                await markKioskEntryTransferred(entry);
+            } catch (err) {
+                setStatus(err.message || "Transferido localmente, pero no se pudo persistir", "warn");
+            }
 
             const key = getKioskEntryKey(entry);
             if (key) {
@@ -3265,6 +3297,8 @@
                 const data = await res.json();
                 const incoming = (Array.isArray(data.items) ? data.items : []).filter((entry) => {
                     if (!isKioskHistoryEntry(entry)) return false;
+                    const estadoEnvio = String(entry?.estado_envio || "").toLowerCase();
+                    if (estadoEnvio === "transferido") return false;
                     return !transferredKioskEntries.has(getKioskEntryKey(entry));
                 });
 
