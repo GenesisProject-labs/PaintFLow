@@ -536,6 +536,54 @@
             gap: 8px;
         }
 
+        /* Modo "solo imagen" hasta que el usuario haga scroll dentro de la card */
+        .cover-card.center .center-body {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            padding-top: 0;
+            padding-bottom: 0;
+            transform: translateY(14px);
+            transition:
+                max-height 380ms cubic-bezier(.22, .61, .36, 1),
+                opacity 260ms ease,
+                transform 380ms cubic-bezier(.22, .61, .36, 1),
+                padding 260ms ease;
+        }
+        .cover-card.center.details-open .center-body {
+            max-height: 600px;
+            opacity: 1;
+            padding-top: 10px;
+            padding-bottom: 14px;
+            transform: translateY(0);
+        }
+
+        .details-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin: 4px auto 0;
+            padding: 8px 14px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #0f4f99;
+            background: #f2f7ff;
+            border: 1px solid #d8e6f7;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: background 160ms ease, transform 160ms ease;
+        }
+        .details-toggle:hover { background: #e6f0ff; }
+        .details-toggle:active { transform: scale(0.97); }
+        .details-toggle .chev {
+            display: inline-block;
+            transition: transform 280ms ease;
+        }
+        .cover-card.center.details-open .details-toggle .chev {
+            transform: rotate(180deg);
+        }
+
         .product-position {
             font-size: 0.82rem;
             color: var(--muted);
@@ -1725,8 +1773,12 @@
                         <div class="name">${escapeHtml(prev.name || "Anterior")}</div>
                     </article>
 
-                    <article class="cover-card center">
+                    <article class="cover-card center" data-center-card>
                         <img class="catalog-image product-pickable" src="${escapeHtml(imageFor(current))}" alt="${escapeHtml(current.name || "Producto")}" role="button" tabindex="0" onclick="openChooser(${idx})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openChooser(${idx});}" />
+                        <button type="button" class="details-toggle" data-details-toggle aria-expanded="false">
+                            <span data-details-label>Ver detalles</span>
+                            <span class="chev">▾</span>
+                        </button>
                         <div class="center-body">
                             <div class="product-position">Producto ${idx + 1} de ${total}</div>
                             <div class="name">${escapeHtml(current.name || "Producto")}</div>
@@ -1746,6 +1798,44 @@
                 <div class="swipe-hint">Desliza, usa las flechas o ← → del teclado para cambiar de producto</div>
             `;
             attachCoverflowSwipe(root);
+            attachDetailsReveal(root);
+        }
+
+        function attachDetailsReveal(root) {
+            const card = root.querySelector("[data-center-card]");
+            if (!card) return;
+            const toggle = card.querySelector("[data-details-toggle]");
+            const label = card.querySelector("[data-details-label]");
+            const setOpen = (open) => {
+                card.classList.toggle("details-open", open);
+                if (toggle) toggle.setAttribute("aria-expanded", open ? "true" : "false");
+                if (label) label.textContent = open ? "Ocultar detalles" : "Ver detalles";
+            };
+            if (toggle) {
+                toggle.addEventListener("click", (ev) => {
+                    ev.stopPropagation();
+                    setOpen(!card.classList.contains("details-open"));
+                });
+            }
+            // Abrir con scroll/swipe vertical dentro de la card (móvil y desktop)
+            let acc = 0;
+            let lastY = null;
+            card.addEventListener("wheel", (ev) => {
+                if (card.classList.contains("details-open")) return;
+                if (ev.deltaY > 6) { ev.preventDefault(); setOpen(true); }
+            }, { passive: false });
+            card.addEventListener("touchstart", (ev) => {
+                if (ev.touches && ev.touches[0]) lastY = ev.touches[0].clientY;
+                acc = 0;
+            }, { passive: true });
+            card.addEventListener("touchmove", (ev) => {
+                if (card.classList.contains("details-open")) return;
+                if (!ev.touches || !ev.touches[0] || lastY == null) return;
+                const y = ev.touches[0].clientY;
+                acc += (lastY - y);
+                lastY = y;
+                if (acc > 28) setOpen(true);
+            }, { passive: true });
         }
 
         function attachCoverflowSwipe(root) {
