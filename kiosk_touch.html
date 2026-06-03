@@ -475,7 +475,8 @@
             display: grid;
             grid-template-columns: minmax(120px, 0.8fr) minmax(0, 1.7fr) minmax(120px, 0.8fr);
             gap: 12px;
-            align-items: start;
+            align-items: center;
+            min-height: 480px;
             animation: productShiftIn 280ms ease;
         }
 
@@ -486,27 +487,21 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            gap: 0;
-            align-self: start;
+            gap: 8px;
             transition: transform 220ms ease, opacity 220ms ease, box-shadow 220ms ease;
         }
 
         .cover-card .catalog-image {
             border: 0;
             border-radius: 0;
-            aspect-ratio: auto;
-            max-height: 360px;
-            width: 100%;
-            object-fit: contain;
-            background: #ffffff;
         }
 
-        .cover-card .catalog-image.is-selectable {
+        .product-pickable {
             cursor: pointer;
-            transition: transform 160ms ease;
+            transition: transform 160ms ease, filter 160ms ease;
         }
-        .cover-card .catalog-image.is-selectable:hover { transform: scale(1.02); }
-        .cover-card .catalog-image.is-selectable:active { transform: scale(0.98); }
+        .product-pickable:hover { transform: scale(1.02); filter: brightness(1.03); }
+        .product-pickable:active { transform: scale(0.98); }
 
         .cover-card.side {
             opacity: 0.74;
@@ -595,15 +590,17 @@
 
         .selected-strip {
             display: flex;
-            justify-content: flex-end;
+            justify-content: space-between;
             align-items: center;
             gap: 10px;
-            margin-bottom: 6px;
-            padding: 0;
-            background: transparent;
-            border: 0;
+            margin-bottom: 10px;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--accent-soft);
+            color: var(--ink);
+            font-weight: 700;
         }
-        .selected-strip:empty { display: none; }
 
         .hidden { display: none !important; }
 
@@ -1688,15 +1685,7 @@
         function renderSelectedColorStrip() {
             const root = document.getElementById("selectedColorStrip");
             if (!root) return;
-            const selected = state.colors[state.selectedColorIndex];
-            if (!selected) {
-                root.innerHTML = "";
-                return;
-            }
-
-            root.innerHTML = `
-                <button class="btn subtle" type="button" onclick="backToColorStep()">← Cambiar color</button>
-            `;
+            root.innerHTML = "";
         }
 
         function renderCatalog() {
@@ -1735,7 +1724,7 @@
                     </article>
 
                     <article class="cover-card center">
-                        <img class="catalog-image is-selectable" src="${escapeHtml(imageFor(current))}" alt="${escapeHtml(current.name || "Producto")}" role="button" tabindex="0" title="Toca para seleccionar este producto" onclick="openChooser(${idx})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openChooser(${idx});}" />
+                        <img class="catalog-image product-pickable" src="${escapeHtml(imageFor(current))}" alt="${escapeHtml(current.name || "Producto")}" role="button" tabindex="0" onclick="openChooser(${idx})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openChooser(${idx});}" />
                         <div class="center-body">
                             <div class="product-position">Producto ${idx + 1} de ${total}</div>
                             <div class="name">${escapeHtml(current.name || "Producto")}</div>
