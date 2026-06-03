@@ -475,8 +475,7 @@
             display: grid;
             grid-template-columns: minmax(120px, 0.8fr) minmax(0, 1.7fr) minmax(120px, 0.8fr);
             gap: 12px;
-            align-items: center;
-            min-height: 480px;
+            align-items: start;
             animation: productShiftIn 280ms ease;
         }
 
@@ -487,13 +486,19 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 0;
+            align-self: start;
             transition: transform 220ms ease, opacity 220ms ease, box-shadow 220ms ease;
         }
 
         .cover-card .catalog-image {
             border: 0;
             border-radius: 0;
+            aspect-ratio: auto;
+            max-height: 360px;
+            width: 100%;
+            object-fit: contain;
+            background: #ffffff;
         }
 
         .cover-card.side {
@@ -583,17 +588,15 @@
 
         .selected-strip {
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-end;
             align-items: center;
             gap: 10px;
-            margin-bottom: 10px;
-            padding: 10px 12px;
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            background: var(--accent-soft);
-            color: var(--ink);
-            font-weight: 700;
+            margin-bottom: 6px;
+            padding: 0;
+            background: transparent;
+            border: 0;
         }
+        .selected-strip:empty { display: none; }
 
         .hidden { display: none !important; }
 
@@ -1685,8 +1688,7 @@
             }
 
             root.innerHTML = `
-                <div>Color seleccionado: ${escapeHtml(selected.codigo || "")} - ${escapeHtml(selected.nombre || "")}</div>
-                <button class="btn subtle" type="button" onclick="backToColorStep()">Cambiar color</button>
+                <button class="btn subtle" type="button" onclick="backToColorStep()">← Cambiar color</button>
             `;
         }
 
