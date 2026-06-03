@@ -2412,8 +2412,22 @@ async def labelsapp_live_queue(
     except HTTPException:
         raise
     except Exception as e:
+        err_text = str(e).lower()
         if getattr(e, "pgcode", "") in {"57014", "55P03"}:
             logger.warning(f"Live queue timeout/lock for {table_name}: {e}")
+            return {
+                "sucursal": sucursal_slug,
+                "tabla": table_name,
+                "total": 0,
+                "items": [],
+            }
+        if (
+            isinstance(e, RuntimeError)
+            or "database unavailable" in err_text
+            or "ssl connection has been closed unexpectedly" in err_text
+            or "could not connect to server" in err_text
+        ):
+            logger.warning(f"Live queue DB unavailable for {table_name}: {e}")
             return {
                 "sucursal": sucursal_slug,
                 "tabla": table_name,
@@ -2483,8 +2497,22 @@ async def labelsapp_pending_queue(
     except HTTPException:
         raise
     except Exception as e:
+        err_text = str(e).lower()
         if getattr(e, "pgcode", "") in {"57014", "55P03"}:
             logger.warning(f"Pending queue timeout/lock for {table_name}: {e}")
+            return {
+                "sucursal": sucursal_slug,
+                "tabla": table_name,
+                "total": 0,
+                "items": [],
+            }
+        if (
+            isinstance(e, RuntimeError)
+            or "database unavailable" in err_text
+            or "ssl connection has been closed unexpectedly" in err_text
+            or "could not connect to server" in err_text
+        ):
+            logger.warning(f"Pending queue DB unavailable for {table_name}: {e}")
             return {
                 "sucursal": sucursal_slug,
                 "tabla": table_name,
