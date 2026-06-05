@@ -411,44 +411,43 @@
             position: relative;
         }
 
-        .color-preview {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin-top: 6px;
-            padding: 4px 10px 4px 4px;
-            border: 1px solid #d8e4f3;
-            border-radius: 999px;
-            background: #f7fbff;
-            font-size: 0.78rem;
-            color: #38516d;
-            max-width: 100%;
-            opacity: 0;
-            transform: translateY(-2px);
-            transition: opacity 220ms ease, transform 220ms ease, background 220ms ease;
-            pointer-events: none;
+        .codigo-input-wrap {
+            position: relative;
         }
-        .color-preview.is-visible {
+        .codigo-input-wrap input {
+            padding-right: 46px;
+        }
+        .color-swatch-dot {
+            position: absolute;
+            top: 50%;
+            right: 10px;
+            transform: translateY(-50%) scale(0.6);
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            border: 1px solid rgba(15, 32, 52, 0.22);
+            background: #e6ecf2;
+            box-shadow: inset 0 0 0 2px rgba(255,255,255,0.6), 0 1px 3px rgba(15,32,52,0.12);
+            opacity: 0;
+            transition: opacity 220ms ease, transform 220ms cubic-bezier(.22,.61,.36,1), background 220ms ease;
+            pointer-events: none;
+            cursor: help;
+        }
+        .color-swatch-dot.is-visible {
             opacity: 1;
-            transform: translateY(0);
+            transform: translateY(-50%) scale(1);
             pointer-events: auto;
         }
-        .color-preview .swatch {
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
-            border: 1px solid rgba(15, 32, 52, 0.18);
-            background: #e6ecf2;
-            flex: 0 0 22px;
-            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5);
+        .color-preview-label {
+            display: none;
+            margin-top: 4px;
+            font-size: 0.78rem;
+            color: #38516d;
         }
-        .color-preview .swatch-label {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 220px;
+        .color-preview-label.is-visible {
+            display: block;
         }
-        .color-preview .swatch-label strong {
+        .color-preview-label strong {
             color: #0e47a6;
             font-weight: 700;
         }
@@ -915,12 +914,12 @@
                     <div class="grid">
                         <div class="autocomplete-wrap">
                             <label for="codigo">Codigo</label>
-                            <input id="codigo" autocomplete="off" placeholder="Ej: SW-7009" />
-                            <div id="codigoSuggestions" class="autocomplete-menu"></div>
-                            <div id="codigoColorPreview" class="color-preview" aria-live="polite">
-                                <span class="swatch" id="codigoColorSwatch" style="background:#e6ecf2"></span>
-                                <span class="swatch-label" id="codigoColorLabel">—</span>
+                            <div class="codigo-input-wrap">
+                                <input id="codigo" autocomplete="off" placeholder="Ej: SW-7009" />
+                                <span id="codigoColorSwatch" class="color-swatch-dot" title="" aria-hidden="true"></span>
                             </div>
+                            <div id="codigoSuggestions" class="autocomplete-menu"></div>
+                            <div id="codigoColorLabel" class="color-preview-label" aria-live="polite"></div>
                         </div>
 
                         <div class="autocomplete-wrap" id="descripcionWrap">
@@ -3667,22 +3666,25 @@
         }
 
         function _hideColorPreview() {
-            const root = document.getElementById("codigoColorPreview");
-            if (root) root.classList.remove("is-visible");
+            const sw = document.getElementById("codigoColorSwatch");
+            const label = document.getElementById("codigoColorLabel");
+            if (sw) { sw.classList.remove("is-visible"); sw.title = ""; }
+            if (label) { label.classList.remove("is-visible"); label.innerHTML = ""; }
         }
 
         function _showColorPreview(hex, name, code) {
-            const root = document.getElementById("codigoColorPreview");
             const sw = document.getElementById("codigoColorSwatch");
             const label = document.getElementById("codigoColorLabel");
-            if (!root || !sw || !label) return;
+            if (!sw || !label) return;
             sw.style.background = hex || "#e6ecf2";
             const safeName = (name || "").toString().trim().replace(/[<>&]/g, "");
             const safeCode = (code || "").toString().trim().replace(/[<>&]/g, "");
+            sw.title = safeCode ? `SW ${safeCode}${safeName ? " – " + safeName : ""}` : safeName;
+            sw.classList.add("is-visible");
             label.innerHTML = safeCode
                 ? `<strong>SW ${safeCode}</strong>${safeName ? " · " + safeName : ""}`
-                : (safeName || "—");
-            root.classList.add("is-visible");
+                : (safeName || "");
+            label.classList.toggle("is-visible", Boolean(label.innerHTML));
         }
 
         async function _fetchSherwinColor(code) {
