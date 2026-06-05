@@ -411,6 +411,48 @@
             position: relative;
         }
 
+        .color-preview {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 6px;
+            padding: 4px 10px 4px 4px;
+            border: 1px solid #d8e4f3;
+            border-radius: 999px;
+            background: #f7fbff;
+            font-size: 0.78rem;
+            color: #38516d;
+            max-width: 100%;
+            opacity: 0;
+            transform: translateY(-2px);
+            transition: opacity 220ms ease, transform 220ms ease, background 220ms ease;
+            pointer-events: none;
+        }
+        .color-preview.is-visible {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+        .color-preview .swatch {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: 1px solid rgba(15, 32, 52, 0.18);
+            background: #e6ecf2;
+            flex: 0 0 22px;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5);
+        }
+        .color-preview .swatch-label {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 220px;
+        }
+        .color-preview .swatch-label strong {
+            color: #0e47a6;
+            font-weight: 700;
+        }
+
         .autocomplete-menu {
             position: absolute;
             top: calc(100% + 6px);
@@ -875,6 +917,10 @@
                             <label for="codigo">Codigo</label>
                             <input id="codigo" autocomplete="off" placeholder="Ej: SW-7009" />
                             <div id="codigoSuggestions" class="autocomplete-menu"></div>
+                            <div id="codigoColorPreview" class="color-preview" aria-live="polite">
+                                <span class="swatch" id="codigoColorSwatch" style="background:#e6ecf2"></span>
+                                <span class="swatch-label" id="codigoColorLabel">—</span>
+                            </div>
                         </div>
 
                         <div class="autocomplete-wrap" id="descripcionWrap">
@@ -2185,6 +2231,7 @@
             const btn = document.querySelector("button[onclick='addToQueue()']");
             if (btn) btn.textContent = "Agregar A Lista";
             setWorkflowStep("codigo");
+            if (typeof _hideColorPreview === "function") _hideColorPreview();
         }
 
         function applyProductRules() {
@@ -2635,6 +2682,7 @@
         async function fillByCodigo() {
             const codigo = document.getElementById("codigo").value.trim();
             if (!codigo) return;
+            if (typeof scheduleColorPreview === "function") scheduleColorPreview(codigo);
 
             let product = productByCode.get(codigo);
             if (!product) {
@@ -2802,6 +2850,7 @@
             document.getElementById("ubicacion").value = item.ubicacion || "";
             applyProductRules();
             document.getElementById("terminacion").value = item.terminacion || "";
+            if (typeof scheduleColorPreview === "function") scheduleColorPreview(item.codigo || "");
             document.getElementById("presentacion").value = item.presentacion || "";
             document.getElementById("cantidad").value = item.cantidad || 1;
             document.getElementById("codigoBase").value = formatCodigoBaseForItem(item);
@@ -3607,12 +3656,80 @@
             }
         }
 
+        // ===== Sherwin color preview (small chip next to codigo) =====
+        const _colorPreviewCache = new Map();
+        let _colorPreviewSeq = 0;
+        let _colorPreviewTimer = null;
+
+        function _extractSherwinCode(raw) {
+            const m = String(raw || "").match(/(\d{3,4})/);
+            return m ? m[1] : "";
+        }
+
+        function _hideColorPreview() {
+            const root = document.getElementById("codigoColorPreview");
+            if (root) root.classList.remove("is-visible");
+        }
+
+        function _showColorPreview(hex, name, code) {
+            const root = document.getElementById("codigoColorPreview");
+            const sw = document.getElementById("codigoColorSwatch");
+            const label = document.getElementById("codigoColorLabel");
+            if (!root || !sw || !label) return;
+            sw.style.background = hex || "#e6ecf2";
+            const safeName = (name || "").toString().trim().replace(/[<>&]/g, "");
+            const safeCode = (code || "").toString().trim().replace(/[<>&]/g, "");
+            label.innerHTML = safeCode
+                ? `<strong>SW ${safeCode}</strong>${safeName ? " · " + safeName : ""}`
+                : (safeName || "—");
+            root.classList.add("is-visible");
+        }
+
+        async function _fetchSherwinColor(code) {
+            if (!code) return null;
+            if (_colorPreviewCache.has(code)) return _colorPreviewCache.get(code);
+            try {
+                const r = await fetch(`${API}/api/v1/sherwin/swatches?codes=${encodeURIComponent(code)}`);
+                if (!r.ok) throw new Error("swatch fetch failed");
+                const data = await r.json();
+                const arr = (data && (data.swatches || data.results || data.items)) || data || [];
+                const list = Array.isArray(arr) ? arr : Object.values(arr || {});
+                const hit = list.find(s => s && String(s.code || s.codigo || "").includes(code)) || list[0];
+                if (!hit) { _colorPreviewCache.set(code, null); return null; }
+                const result = {
+                    code: String(hit.code || hit.codigo || code),
+                    name: hit.name || hit.nombre || "",
+                    hex: hit.hex || hit.color || hit.color_hex || ""
+                };
+                _colorPreviewCache.set(code, result);
+                return result;
+            } catch (_) {
+                _colorPreviewCache.set(code, null);
+                return null;
+            }
+        }
+
+        function scheduleColorPreview(rawValue) {
+            const code = _extractSherwinCode(rawValue);
+            if (!code) { _hideColorPreview(); return; }
+            clearTimeout(_colorPreviewTimer);
+            const seq = ++_colorPreviewSeq;
+            _colorPreviewTimer = setTimeout(async () => {
+                const data = await _fetchSherwinColor(code);
+                if (seq !== _colorPreviewSeq) return;
+                if (!data || !data.hex) { _hideColorPreview(); return; }
+                _showColorPreview(data.hex, data.name, data.code);
+            }, 220);
+        }
+
         document.getElementById("codigo").addEventListener("input", (e) => {
             activeSuggestionIndex = -1;
             renderCodeSuggestions(e.target.value);
+            scheduleColorPreview(e.target.value);
         });
         document.getElementById("codigo").addEventListener("focus", (e) => {
             renderCodeSuggestions(e.target.value);
+            scheduleColorPreview(e.target.value);
         });
         document.getElementById("codigo").addEventListener("keydown", (e) => {
             if (!codeSuggestions.length) {
