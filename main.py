@@ -735,10 +735,6 @@ def _get_labelsapp_live_queue(db, table_name: str, limit: int = 50):
         WHERE {estado_expr} <> 'Cancelado'
         GROUP BY id_factura
         HAVING SUM(CASE WHEN {estado_expr} IN ('Finalizado','Completado') THEN 1 ELSE 0 END) < COUNT(*)
-           AND (
-               SUM(CASE WHEN {estado_expr} = 'En Proceso' THEN 1 ELSE 0 END) > 0
-               OR SUM(CASE WHEN {estado_expr} IN ('Finalizado','Completado') THEN 1 ELSE 0 END) > 0
-           )
         ORDER BY pr_rank DESC, id_factura DESC
         LIMIT %s
         """,
