@@ -2516,7 +2516,9 @@ async def labelsapp_send(payload: LabelsAppSendRequest, db=Depends(get_db)):
             or factura_hint.startswith("KIOSK-")
             or factura_hint.startswith("BORRADOR-")
         )
-        estado_inicial = "Pendiente" if is_kiosk_or_client else "En Proceso"
+        # Las órdenes siempre entran como "Pendiente" para que el colorista
+        # pueda asignarse antes de pasar a "En Proceso".
+        estado_inicial = "Pendiente"
 
         for idx, item in enumerate(payload.items):
             cantidad = max(1, int(item.cantidad or 1))
