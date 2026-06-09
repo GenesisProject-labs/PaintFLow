@@ -100,8 +100,25 @@ _labelsapp_queue_cache = {
     "pending": {},
 }
 _labelsapp_queue_cache_lock = Lock()
-_labelsapp_live_fetch_lock = Lock()
-_labelsapp_pending_fetch_lock = Lock()
+# Locks por tabla: si dos requests piden la misma sucursal en paralelo solo uno
+# pega a la DB, pero requests para sucursales distintas no se serializan entre si.
+# Un solo Lock global hace que el dashboard de analistas (fanout a 13 sucursales)
+# encole los requests y el cliente abandone con 499 a los ~4.5s.
+_labelsapp_live_fetch_locks: Dict[str, Lock] = {}
+_labelsapp_pending_fetch_locks: Dict[str, Lock] = {}
+_labelsapp_fetch_locks_guard = Lock()
+
+
+def _get_table_lock(registry: Dict[str, Lock], table_name: str) -> Lock:
+    lock = registry.get(table_name)
+    if lock is not None:
+        return lock
+    with _labelsapp_fetch_locks_guard:
+        lock = registry.get(table_name)
+        if lock is None:
+            lock = Lock()
+            registry[table_name] = lock
+        return lock
 
 
 def _queue_cache_get(kind: str, key):
@@ -2667,7 +2684,7 @@ async def labelsapp_live_queue(
                     "items": [],
                 }
 
-            with _labelsapp_live_fetch_lock:
+            with _get_table_lock(_labelsapp_live_fetch_locks, table_name):
                 items = _queue_cache_get("live", cache_key)
                 if items is None:
                     _set_local_pg_timeouts(db, statement_ms=2500, lock_ms=500)
@@ -2752,7 +2769,7 @@ async def labelsapp_pending_queue(
                     "items": [],
                 }
 
-            with _labelsapp_pending_fetch_lock:
+            with _get_table_lock(_labelsapp_pending_fetch_locks, table_name):
                 items = _queue_cache_get("pending", cache_key)
                 if items is None:
                     _set_local_pg_timeouts(db, statement_ms=2500, lock_ms=500)
