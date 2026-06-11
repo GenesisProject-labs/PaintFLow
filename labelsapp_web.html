@@ -1019,7 +1019,7 @@
                         <div class="autocomplete-wrap">
                             <label for="codigo">Codigo</label>
                             <div class="codigo-input-wrap">
-                                <input id="codigo" autocomplete="off" placeholder="Ej: SW-7009" />
+                                <input id="codigo" autocomplete="off" placeholder="Ej: SW 7009" />
                                 <span id="codigoColorSwatch" class="color-swatch-dot" title="" tabindex="0" aria-label="Vista previa de color"></span>
                                 <div id="codigoColorPopover" class="color-swatch-popover" role="tooltip" aria-hidden="true">
                                     <span class="big-swatch" id="codigoColorBig"></span>
@@ -1517,15 +1517,15 @@
             },
             "laca": {
                 terminaciones: ["Mate", "Semimate", "Brillo"],
-                presentaciones: ["1/8", "Cuarto", "Medio Galon", "3/4", "Galon"]
+                presentaciones: ["1/8", "1/4", "Medio Galon", "3/4", "Galon"]
             },
             "monocapa": {
                 terminaciones: ["Mate", "Semimate", "Brillo"],
-                presentaciones: ["1/8", "Cuarto", "Medio Galon", "3/4", "Galon", "Cubeta"]
+                presentaciones: ["1/8", "1/4", "Medio Galon", "3/4", "Galon", "Cubeta"]
             },
             "uretano": {
                 terminaciones: ["Mate", "Semimate", "Brillo"],
-                presentaciones: ["1/8", "Cuarto", "Medio Galon", "3/4", "Galon", "Cubeta"]
+                presentaciones: ["1/8", "1/4", "Medio Galon", "3/4", "Galon", "Cubeta"]
             },
             "industrial": {
                 terminaciones: ["Mate", "Semimate", "Brillo"],
@@ -1533,11 +1533,11 @@
             },
             "esmalte kem": {
                 terminaciones: ["Mate", "Semimate", "Brillo"],
-                presentaciones: ["1/8", "Cuarto", "Medio Galon", "Galon"]
+                presentaciones: ["1/8", "1/4", "Medio Galon", "Galon"]
             },
             "tinte al thinner": {
                 terminaciones: ["Claro", "Intermedio", "Especial"],
-                presentaciones: ["1/8", "Cuarto", "Medio Galon", "Galon"]
+                presentaciones: ["1/8", "1/4", "Medio Galon", "Galon"]
             },
             "excello premium": {
                 terminaciones: ["Mate", "Satin", "Semigloss", "Semisatin"],
@@ -2463,6 +2463,7 @@
             const p = normalize(presentacion);
             if (p === "1/8") return "1/8";
             if (p === "3/4") return "3/4";
+            if (p === "1/4") return "1/4";
             if (p.includes("cuarto")) return "QT";
             if (p.includes("medio")) return "1/2";
             if (p.includes("galon")) return "1";
