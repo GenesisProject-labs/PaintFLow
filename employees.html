@@ -92,6 +92,34 @@
         .user-menu-container {
             position: relative;
         }
+
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .catalog-share-btn {
+            background: linear-gradient(135deg, #16a34a 0%, #0d7a37 100%);
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 25px;
+            border: 1px solid rgba(22, 163, 74, 0.35);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.92em;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.25s ease;
+            box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);
+        }
+
+        .catalog-share-btn:hover {
+            background: linear-gradient(135deg, #0d7a37 0%, #075521 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(22, 163, 74, 0.35);
+        }
         
         .user-dropdown-btn {
             background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
@@ -1372,6 +1400,10 @@
                 </div>
             </div>
             <div class="user-menu">
+                <button class="catalog-share-btn" type="button" onclick="abrirCatalogoPublico()" title="Abre el catálogo del cliente y copia el link para enviar">
+                    <span aria-hidden="true">🎟️</span>
+                    <span>Catálogo</span>
+                </button>
                 <div class="user-menu-container">
                     <button class="user-dropdown-btn" id="userDropdownBtn" onclick="toggleUserDropdown()">
                         <div class="user-avatar" id="userAvatar">U</div>
@@ -2681,6 +2713,40 @@
             const userDropdownBtn = document.getElementById('userDropdownBtn');
             userDropdown.classList.toggle('active');
             userDropdownBtn.classList.toggle('active');
+        }
+
+        async function abrirCatalogoPublico() {
+            try {
+                const raw = localStorage.getItem('currentUser');
+                const u = raw ? (JSON.parse(raw) || {}) : {};
+                let sucursalNombre = '';
+                const sucId = u && u.sucursal_id;
+                if (sucId) {
+                    try {
+                        const r = await fetch(`${window.location.origin}/api/v1/sucursales?limit=500`);
+                        if (r.ok) {
+                            const d = await r.json();
+                            const rows = Array.isArray(d.sucursales) ? d.sucursales : [];
+                            const row = rows.find(s => Number(s && s.id) === Number(sucId));
+                            if (row) sucursalNombre = String(row.nombre || '').trim();
+                        }
+                    } catch (_) {}
+                }
+                if (!sucursalNombre) {
+                    sucursalNombre = (window.prompt('Sucursal del catálogo (nombre exacto):', 'principal') || '').trim();
+                    if (!sucursalNombre) return;
+                }
+                const url = `${window.location.origin}/cliente?publico=1&sucursal=${encodeURIComponent(sucursalNombre)}`;
+                try { window.open(url, '_blank', 'noopener'); } catch (_) {}
+                try {
+                    await navigator.clipboard.writeText(url);
+                    window.alert(`Catálogo abierto en nueva pestaña.\n\nLink copiado al portapapeles (sucursal: ${sucursalNombre}):\n${url}`);
+                } catch (_) {
+                    window.prompt('Copiá este link para enviarlo al cliente:', url);
+                }
+            } catch (err) {
+                window.alert('No se pudo abrir el catálogo: ' + (err && err.message || err));
+            }
         }
 
         // Sistema de alertas moderno que reemplaza los popups nativos.

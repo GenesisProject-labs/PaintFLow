@@ -1242,6 +1242,7 @@
             selectedColorIndex: -1,
             selectedCatalogIndex: 0,
             currentUser: null,
+            publicMode: false,
             sucursalNameById: {},
             chooserDefaults: {
                 terminacion: "Mate",
@@ -1561,6 +1562,11 @@
         function refreshSessionPills() {
             const userPill = document.getElementById("kioskSessionUser");
             const sucPill = document.getElementById("kioskSessionSucursal");
+            if (state.publicMode) {
+                if (userPill) userPill.textContent = "Cliente (Catalogo publico)";
+                if (sucPill) sucPill.textContent = `Sucursal: ${getSucursal() || "principal"}`;
+                return;
+            }
             const user = state.currentUser;
             if (!user) {
                 if (userPill) userPill.textContent = "Invitado";
@@ -1573,7 +1579,42 @@
             if (sucPill) sucPill.textContent = `Sucursal: ${getSucursal() || "Sin sucursal"}`;
         }
 
+        function getPublicModeFromUrl() {
+            try {
+                const params = new URLSearchParams(window.location.search || "");
+                const flag = String(params.get("publico") || params.get("public") || "").toLowerCase();
+                if (!["1", "true", "yes", "si"].includes(flag)) return null;
+                return {
+                    sucursal: (params.get("sucursal") || params.get("s") || "").trim(),
+                    sucursalId: (params.get("sucursal_id") || "").trim()
+                };
+            } catch (_) {
+                return null;
+            }
+        }
+
         async function initSessionContext() {
+            const publicCtx = getPublicModeFromUrl();
+            if (publicCtx) {
+                state.publicMode = true;
+                state.currentUser = null;
+                await loadSucursalesMap();
+                const sucInput = document.getElementById("checkoutSucursal");
+                let suc = publicCtx.sucursal;
+                if (!suc && publicCtx.sucursalId) {
+                    suc = state.sucursalNameById[publicCtx.sucursalId] || "";
+                }
+                suc = suc || "principal";
+                if (sucInput) {
+                    sucInput.value = suc;
+                    sucInput.readOnly = true;
+                    sucInput.style.background = "#eef6ff";
+                    sucInput.style.fontWeight = "700";
+                }
+                refreshSessionPills();
+                return true;
+            }
+
             state.currentUser = getCurrentUser();
             if (!state.currentUser) {
                 window.location.href = "/";
